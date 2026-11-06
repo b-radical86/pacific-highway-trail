@@ -23,3 +23,7 @@ Rationale: Guarantees 60 FPS zero-allocation vector rendering across both cartri
 Date: 2026-11-06
 Decision: Implement Phase 4 interactive obstacle crossings (`river_scene.js`) and 30-second pointer-normalized target mini-games (`hunt_scene.js`).
 Rationale: Delivers cartridge-adaptive river/gridlock obstacle physics, The Dalles canyon rapids steering, and touch/pointer-safe hunting/rest-stop defence with authentic carry caps.
+
+Date: 2026-11-06
+Decision: Implement Phase 5 desktop command UI (`app/static/index.html`), phased travel animation sequencer (`app.js`), and procedural Web Audio synthesizer (`audio_synth.js`).
+Rationale: Integrates Alpine.js reactive presentation with headless simulation state, provides keyboard hotkey loop ([Space], [R], [P], [1-4]), and unlocks zero-dependency procedural audio.

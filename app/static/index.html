@@ -11,20 +11,18 @@
     .font-pixel { font-family: 'Press Start 2P', monospace; }
     .font-ui { font-family: 'Space Grotesk', -apple-system, sans-serif; }
 
-    /* Subtle retro CRT scanline overlay (toggleable) */
     .crt-overlay::before {
       content: " ";
       display: block;
       position: absolute;
       top: 0; left: 0; bottom: 0; right: 0;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.28) 50%);
       background-size: 100% 4px;
       z-index: 20;
       pointer-events: none;
       opacity: 0.6;
     }
 
-    /* Crisp pixel rendering */
     canvas {
       image-rendering: -moz-crisp-edges;
       image-rendering: -webkit-crisp-edges;
@@ -34,9 +32,9 @@
   </style>
 </head>
 <body class="h-full font-ui overflow-hidden flex flex-col items-center justify-center p-2 sm:p-4 bg-gradient-to-b from-neutral-950 via-neutral-900 to-black"
-      x-data="desktopInterface()" x-init="init()" @keydown.window="handleKeydown($event)">
+      x-data="trailApp" @keydown.window="handleKeydown($event)">
 
-  <!-- Desktop App Shell (16:10 / 16:9 Optimized Bezel) -->
+  <!-- Desktop App Shell (16:10 / 16:9 Bezel) -->
   <div class="w-full max-w-6xl h-[96vh] flex flex-col bg-neutral-900 border-2 border-neutral-700/80 rounded-xl shadow-2xl overflow-hidden relative"
        :class="{ 'crt-overlay': crtEnabled }">
 
@@ -52,15 +50,15 @@
         <span class="px-2 py-0.5 rounded bg-neutral-800 text-neutral-400 font-mono text-[10px]">DESKTOP v1.0</span>
       </div>
 
-      <!-- Cartridge Selector Switch -->
+      <!-- Cartridge Switcher -->
       <div class="flex items-center bg-neutral-900 p-0.5 rounded-lg border border-neutral-700">
         <button @click="switchCartridge('pacific_2026')"
-                :class="cartridge === 'pacific_2026' ? 'bg-amber-500 text-neutral-950 font-bold' : 'text-neutral-400 hover:text-white'"
+                :class="cartridgeId === 'pacific_2026' ? 'bg-amber-500 text-neutral-950 font-bold' : 'text-neutral-400 hover:text-white'"
                 class="px-2.5 py-1 rounded text-[11px] transition">
           2026 M1 Gauntlet
         </button>
         <button @click="switchCartridge('oregon_1848')"
-                :class="cartridge === 'oregon_1848' ? 'bg-amber-500 text-neutral-950 font-bold' : 'text-neutral-400 hover:text-white'"
+                :class="cartridgeId === 'oregon_1848' ? 'bg-amber-500 text-neutral-950 font-bold' : 'text-neutral-400 hover:text-white'"
                 class="px-2.5 py-1 rounded text-[11px] transition">
           1848 Oregon Trail
         </button>
@@ -82,64 +80,63 @@
       </div>
     </header>
 
-    <!-- Main Desktop Layout (Upper Viewport Stage + Lower Command Console) -->
+    <!-- Main Desktop Layout -->
     <div class="flex-1 flex flex-col overflow-hidden">
 
-      <!-- Upper Viewport Stage (Canvas 800x400 Virtual Viewport) -->
-      <div class="relative w-full h-[54%] bg-black flex items-center justify-center overflow-hidden border-b border-neutral-800 group">
+      <!-- Upper Viewport Stage (800x400 Virtual Viewport) -->
+      <div class="relative w-full h-[54%] bg-black flex items-center justify-center overflow-hidden border-b border-neutral-800">
         <canvas id="trailCanvas" width="800" height="400"
                 class="w-full h-full object-contain max-h-[460px] cursor-crosshair">
         </canvas>
 
-        <!-- Viewport Overlays -->
-        <div class="absolute top-3 left-4 flex items-center space-x-2 z-10">
-          <span class="px-2 py-0.5 rounded bg-black/70 backdrop-blur border border-neutral-700/60 font-pixel text-[9px] text-amber-300"
-                x-text="currentSceneLabel"></span>
-          <span class="px-2 py-0.5 rounded bg-black/70 backdrop-blur border border-neutral-700/60 font-mono text-[10px] text-neutral-300"
-                x-text="'Time: ' + simTimeStr"></span>
-          <span class="px-2 py-0.5 rounded bg-black/70 backdrop-blur border border-neutral-700/60 font-mono text-[10px] text-emerald-400"
-                x-text="'Weather: ' + weather"></span>
+        <!-- Status Badges Overlay -->
+        <div class="absolute top-3 left-4 flex items-center space-x-2 z-10 font-mono text-[10px]">
+          <span class="px-2 py-0.5 rounded bg-black/75 backdrop-blur border border-neutral-700/60 font-pixel text-[9px] text-amber-300"
+                x-text="cartridgeId === 'pacific_2026' ? 'M1 PACIFIC MOTORWAY' : 'THE OREGON TRAIL'"></span>
+          <span class="px-2 py-0.5 rounded bg-black/75 backdrop-blur border border-neutral-700/60 text-neutral-200"
+                x-text="'Turn ' + ui.turn + ' (' + ui.timeUnit + ')'"></span>
+          <span class="px-2 py-0.5 rounded bg-black/75 backdrop-blur border border-neutral-700/60 text-emerald-400"
+                x-text="'Score: ' + ui.score"></span>
         </div>
 
         <div class="absolute top-3 right-4 flex items-center space-x-2 z-10 font-mono text-[10px] text-neutral-400">
           <span class="px-2 py-0.5 rounded bg-black/70 border border-neutral-800">
-            FPS: <span class="text-neutral-200" x-text="fps"></span>
+            FPS: <span class="text-neutral-200" x-text="ui.fps"></span>
           </span>
           <span class="px-2 py-0.5 rounded bg-black/70 border border-neutral-800">
             Res: 800x400
           </span>
         </div>
 
-        <!-- Arthur Code Brown / Event VFX Quick Notification Badge -->
-        <div x-show="vfxStinkLines && cartridge === 'pacific_2026'"
-             x-transition
-             class="absolute bottom-3 left-4 px-3 py-1 rounded bg-amber-950/80 border border-amber-600/80 font-pixel text-[9px] text-amber-300 flex items-center space-x-2">
-          <span>⚠️ AIR QUALITY CRISIS (Arthur Code Brown Active)</span>
+        <!-- Traveling Animation Banner -->
+        <div x-show="isTraveling" x-transition
+             class="absolute bottom-3 right-4 px-3 py-1 rounded bg-amber-500 text-neutral-950 font-bold text-xs font-mono flex items-center space-x-2">
+          <span class="animate-pulse">▶ TRAVELING...</span>
+          <span class="text-[10px] bg-amber-700/50 px-1 rounded">[Space to Skip]</span>
         </div>
       </div>
 
-      <!-- Lower Command Console (Desktop 3-Column Cockpit) -->
+      <!-- Lower Command Console (3 Columns) -->
       <div class="flex-1 bg-neutral-900/95 p-3 grid grid-cols-12 gap-3 overflow-y-auto">
 
-        <!-- Column 1: Party Roster & Vitality (4 cols) -->
+        <!-- Col 1: Party Roster & Vitality (4 cols) -->
         <div class="col-span-4 bg-neutral-950/70 border border-neutral-800 rounded-lg p-2.5 flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between pb-1.5 border-b border-neutral-800 mb-2">
               <span class="font-pixel text-[10px] text-amber-400">PARTY ROSTER</span>
-              <span class="text-[10px] font-mono text-neutral-400" x-text="partySubtitle"></span>
+              <span class="text-[10px] font-mono text-neutral-400" x-text="cartridgeId === 'pacific_2026' ? 'Kia Carnival (6 Pax)' : 'Pioneer Wagon (5 Pax)'"></span>
             </div>
             <div class="space-y-1.5">
-              <template x-for="(member, idx) in party" :key="member.name">
+              <template x-for="member in ui.party" :key="member.name">
                 <div class="p-1.5 rounded bg-neutral-900/80 border border-neutral-800/80 flex items-center justify-between text-xs">
-                  <div class="flex items-center space-x-2 min-w-[90px]">
+                  <div class="flex items-center space-x-2 min-w-[85px]">
                     <span class="w-2 h-2 rounded-full" :class="member.health > 50 ? 'bg-emerald-400' : (member.health > 20 ? 'bg-amber-400' : 'bg-red-500')"></span>
-                    <span class="font-semibold text-neutral-200 text-xs" x-text="member.name"></span>
+                    <span class="font-semibold text-neutral-200 text-xs truncate" x-text="member.name"></span>
                   </div>
 
-                  <!-- Health / Sanity Gauges -->
                   <div class="flex-1 mx-2">
                     <div class="flex justify-between text-[9px] text-neutral-400 font-mono mb-0.5">
-                      <span x-text="member.role === 'pet' ? 'Calm' : (member.role === 'primary' ? (cartridge==='pacific_2026' ? 'Sanity' : 'Morale') : 'Health')"></span>
+                      <span x-text="member.role === 'pet' ? 'Calm' : (member.role === 'primary' ? (cartridgeId === 'pacific_2026' ? 'Sanity' : 'Morale') : 'Health')"></span>
                       <span x-text="member.health + '%'"></span>
                     </div>
                     <div class="w-full bg-neutral-800 rounded-full h-1.5 overflow-hidden">
@@ -150,152 +147,141 @@
                   </div>
 
                   <span class="px-1.5 py-0.5 rounded text-[9px] font-mono shrink-0"
-                        :class="member.status === 'Zen' || member.status === 'Happy' || member.status === 'Healthy' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/50' : 'bg-amber-950 text-amber-400 border border-amber-800/50'"
+                        :class="member.status === 'Zen' || member.status === 'Happy' || member.status === 'Healthy' || member.status === 'Clean' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/50' : 'bg-amber-950 text-amber-400 border border-amber-800/50'"
                         x-text="member.status"></span>
                 </div>
               </template>
             </div>
           </div>
 
-          <!-- Quick Roster Footer -->
           <div class="pt-2 border-t border-neutral-800/60 flex items-center justify-between text-[10px] text-neutral-400 font-mono">
-            <span>Overall Vitality: <strong class="text-neutral-200" x-text="partyVitalityScore + '%'"></strong></span>
-            <span x-show="cartridge === 'pacific_2026'">Dad Ego: <strong class="text-amber-400" x-text="'+' + dadEgo"></strong></span>
+            <span>Status: <strong class="text-neutral-200" x-text="ui.status"></strong></span>
+            <span x-show="cartridgeId === 'pacific_2026'">Dad Ego: <strong class="text-amber-400" x-text="'+' + ui.dadEgo"></strong></span>
           </div>
         </div>
 
-        <!-- Column 2: Vehicle, Telemetry & Supplies (4 cols) -->
+        <!-- Col 2: Cargo & Telemetry (4 cols) -->
         <div class="col-span-4 bg-neutral-950/70 border border-neutral-800 rounded-lg p-2.5 flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between pb-1.5 border-b border-neutral-800 mb-2">
-              <span class="font-pixel text-[10px] text-amber-400" x-text="cartridge === 'pacific_2026' ? 'CARGO & SERVO SUPPLIES' : 'WAGON & TRAIL STORES'"></span>
-              <span class="font-mono text-emerald-400 text-xs font-bold" x-text="'$' + (cashCents/100).toFixed(2)"></span>
+              <span class="font-pixel text-[10px] text-amber-400" x-text="cartridgeId === 'pacific_2026' ? 'CARGO & SERVO STORES' : 'WAGON & TRAIL STORES'"></span>
+              <span class="font-mono text-emerald-400 text-xs font-bold" x-text="'$' + (ui.cashCents/100).toFixed(2)"></span>
             </div>
 
             <!-- Supply Grid -->
             <div class="grid grid-cols-2 gap-2 mb-3">
               <div class="bg-neutral-900/80 p-2 rounded border border-neutral-800">
-                <div class="text-[9px] font-mono text-neutral-400" x-text="cartridge === 'pacific_2026' ? 'Car Snacks (pkts)' : 'Rations (lbs)'"></div>
-                <div class="text-base font-bold text-neutral-100" x-text="supplies.food"></div>
+                <div class="text-[9px] font-mono text-neutral-400" x-text="cartridgeId === 'pacific_2026' ? 'Car Snacks (pkts)' : 'Rations (lbs)'"></div>
+                <div class="text-base font-bold text-neutral-100" x-text="ui.supplies.food"></div>
               </div>
               <div class="bg-neutral-900/80 p-2 rounded border border-neutral-800">
-                <div class="text-[9px] font-mono text-neutral-400" x-text="cartridge === 'pacific_2026' ? 'Hot Chips / 50¢' : 'Ammunition'"></div>
-                <div class="text-base font-bold text-neutral-100" x-text="supplies.ammo"></div>
+                <div class="text-[9px] font-mono text-neutral-400" x-text="cartridgeId === 'pacific_2026' ? 'Chips / 50¢ Coins' : 'Ammunition'"></div>
+                <div class="text-base font-bold text-neutral-100" x-text="ui.supplies.ammo"></div>
               </div>
               <div class="bg-neutral-900/80 p-2 rounded border border-neutral-800">
-                <div class="text-[9px] font-mono text-neutral-400" x-text="cartridge === 'pacific_2026' ? 'Fuel & Espresso' : 'Oxen Stamina'"></div>
-                <div class="flex items-center space-x-1.5">
-                  <div class="text-base font-bold text-amber-400" x-text="traction + '%'"></div>
-                </div>
+                <div class="text-[9px] font-mono text-neutral-400" x-text="cartridgeId === 'pacific_2026' ? 'Fuel & Espresso' : 'Oxen Stamina'"></div>
+                <div class="text-base font-bold text-amber-400" x-text="ui.traction + '%'"></div>
               </div>
               <div class="bg-neutral-900/80 p-2 rounded border border-neutral-800">
-                <div class="text-[9px] font-mono text-neutral-400" x-text="cartridge === 'pacific_2026' ? 'Nappy / Wipe Kits' : 'Spare Wheels'"></div>
-                <div class="text-base font-bold text-neutral-100" x-text="supplies.partA"></div>
+                <div class="text-[9px] font-mono text-neutral-400" x-text="cartridgeId === 'pacific_2026' ? 'Nappy / Wipe Kits' : 'Spare Wheels'"></div>
+                <div class="text-base font-bold text-neutral-100" x-text="ui.supplies.partA"></div>
               </div>
             </div>
 
-            <!-- Route Progress Progress Bar -->
+            <!-- Progress Bar -->
             <div class="bg-neutral-900/90 p-2 rounded border border-neutral-800 space-y-1">
               <div class="flex justify-between text-[10px] font-mono text-neutral-300">
-                <span>Progress: <strong class="text-amber-400" x-text="distance + ' / ' + totalRouteDistance + ' ' + distanceUnit"></strong></span>
-                <span class="text-neutral-400" x-text="((distance/totalRouteDistance)*100).toFixed(0) + '%'"></span>
+                <span>Progress: <strong class="text-amber-400" x-text="ui.distance + ' / ' + ui.totalDistance + ' ' + ui.distanceUnit"></strong></span>
+                <span class="text-neutral-400" x-text="((ui.distance / ui.totalDistance) * 100).toFixed(0) + '%'"></span>
               </div>
               <div class="w-full bg-neutral-800 rounded-full h-2 overflow-hidden">
                 <div class="bg-gradient-to-r from-amber-600 to-amber-400 h-full rounded-full transition-all duration-300"
-                     :style="'width: ' + ((distance/totalRouteDistance)*100) + '%'"></div>
+                     :style="'width: ' + ((ui.distance / ui.totalDistance) * 100) + '%'"></div>
               </div>
               <div class="text-[9px] font-mono text-neutral-400 truncate pt-0.5">
-                Next: <span class="text-neutral-200" x-text="nextWaypoint"></span>
+                Next: <span class="text-neutral-200" x-text="ui.nextWaypointName"></span>
               </div>
             </div>
           </div>
 
-          <!-- Pace & Rations Indicator -->
           <div class="pt-2 border-t border-neutral-800/60 flex items-center justify-between text-[10px] font-mono">
-            <span class="text-neutral-400">Pace: <strong class="text-neutral-200" x-text="pace"></strong></span>
-            <span class="text-neutral-400">Rations: <strong class="text-neutral-200" x-text="rations"></strong></span>
+            <span class="text-neutral-400">Pace: <strong class="text-neutral-200 uppercase" x-text="ui.pace"></strong></span>
+            <span class="text-neutral-400">Rations: <strong class="text-neutral-200 uppercase" x-text="ui.rations"></strong></span>
           </div>
         </div>
 
-        <!-- Column 3: Desktop Command Deck & Action Hotkeys (4 cols) -->
+        <!-- Col 3: Action Deck (4 cols) -->
         <div class="col-span-4 bg-neutral-950/70 border border-neutral-800 rounded-lg p-2.5 flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between pb-1.5 border-b border-neutral-800 mb-2">
               <span class="font-pixel text-[10px] text-amber-400">ACTION COCKPIT</span>
-              <span class="text-[9px] font-mono text-neutral-500">HOTKEYS READY</span>
+              <span class="text-[9px] font-mono text-neutral-500">KEYBOARD HOTKEYS</span>
             </div>
 
-            <!-- Primary Action Buttons -->
+            <!-- Primary Actions -->
             <div class="grid grid-cols-1 gap-2">
-              <button @click="advanceTurn()"
-                      class="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-neutral-950 font-bold rounded flex items-center justify-between text-xs shadow transition active:scale-[0.99]">
+              <button @click="advanceTurn()" :disabled="isTraveling"
+                      class="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-neutral-950 font-bold rounded flex items-center justify-between text-xs shadow transition active:scale-[0.99] disabled:opacity-50">
                 <span class="flex items-center space-x-1.5">
                   <span class="font-pixel text-[11px]">▶</span>
-                  <span x-text="cartridge === 'pacific_2026' ? 'Drive Next Leg' : 'Continue Trail'"></span>
+                  <span x-text="cartridgeId === 'pacific_2026' ? 'Drive Next Leg' : 'Continue Trail'"></span>
                 </span>
                 <span class="bg-amber-700/40 text-neutral-950 px-1.5 py-0.5 rounded text-[10px] font-mono">[Space]</span>
               </button>
 
               <div class="grid grid-cols-2 gap-2">
-                <button @click="restTurn()"
-                        class="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 font-medium rounded border border-neutral-700/80 flex items-center justify-between text-xs transition">
-                  <span x-text="cartridge === 'pacific_2026' ? '☕ Rest / Servo' : '⛺ Camp & Rest'"></span>
+                <button @click="restTurn()" :disabled="isTraveling"
+                        class="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 font-medium rounded border border-neutral-700/80 flex items-center justify-between text-xs transition disabled:opacity-50">
+                  <span x-text="cartridgeId === 'pacific_2026' ? '☕ Rest / Servo' : '⛺ Camp & Rest'"></span>
                   <span class="text-neutral-400 font-mono text-[10px]">[R]</span>
                 </button>
-                <button @click="cyclePace()"
-                        class="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 font-medium rounded border border-neutral-700/80 flex items-center justify-between text-xs transition">
+                <button @click="cyclePace()" :disabled="isTraveling"
+                        class="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 font-medium rounded border border-neutral-700/80 flex items-center justify-between text-xs transition disabled:opacity-50">
                   <span>⚡ Pace</span>
                   <span class="text-neutral-400 font-mono text-[10px]">[P]</span>
                 </button>
               </div>
 
-              <div class="grid grid-cols-2 gap-2">
-                <button @click="openSampleDilemma()"
-                        class="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-amber-300 font-medium rounded border border-neutral-700/80 flex items-center justify-between text-xs transition">
-                  <span>🎲 Test Dilemma</span>
-                  <span class="text-neutral-400 font-mono text-[10px]">[E]</span>
-                </button>
-                <button @click="triggerMiniGame()"
-                        class="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 font-medium rounded border border-neutral-700/80 flex items-center justify-between text-xs transition">
-                  <span x-text="cartridge === 'pacific_2026' ? '🎯 Bin Chickens' : '🎯 Hunt Game'"></span>
+              <div class="grid grid-cols-1 gap-2">
+                <button @click="launchMiniGame()" :disabled="isTraveling"
+                        class="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-amber-300 font-medium rounded border border-neutral-700/80 flex items-center justify-between text-xs transition disabled:opacity-50">
+                  <span x-text="cartridgeId === 'pacific_2026' ? '🎯 Rest-Stop Defence' : '🎯 Prairie Hunt'"></span>
                   <span class="text-neutral-400 font-mono text-[10px]">[H]</span>
                 </button>
               </div>
             </div>
           </div>
 
-          <!-- Event Log / Telemetry Ticker -->
+          <!-- Dispatch Log Ticker -->
           <div class="mt-2 p-2 bg-black/60 rounded border border-neutral-800/80">
             <div class="text-[9px] font-mono text-neutral-400 mb-1 flex justify-between">
               <span>DISPATCH LOG</span>
-              <span class="text-neutral-400 text-[8px]" x-text="'Turn ' + turnNumber"></span>
+              <span class="text-neutral-400 text-[8px]" x-text="'Turn ' + ui.turn"></span>
             </div>
-            <div class="font-mono text-[10px] text-neutral-300 line-clamp-2 h-7" x-text="lastLogMessage"></div>
+            <div class="font-mono text-[10px] text-neutral-300 line-clamp-2 h-7" x-text="ui.lastLog"></div>
           </div>
         </div>
 
       </div>
     </div>
 
-    <!-- Interactive Dilemma Modal (Desktop Overlay) -->
-    <div x-show="modalOpen" x-transition.opacity
+    <!-- DILEMMA MODAL -->
+    <div x-show="modalType === 'DILEMMA' && activeEvent" x-transition.opacity
          class="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="bg-neutral-900 border-2 border-amber-500/80 rounded-xl max-w-2xl w-full p-5 shadow-2xl space-y-4"
-           @click.outside="modalOpen = false">
-
+      <div class="bg-neutral-900 border-2 border-amber-500/80 rounded-xl max-w-2xl w-full p-5 shadow-2xl space-y-4">
         <div class="flex items-center justify-between border-b border-neutral-800 pb-2">
           <div class="flex items-center space-x-2">
-            <span class="font-pixel text-xs text-amber-400" x-text="activeModal.title"></span>
-            <span class="px-2 py-0.5 rounded bg-amber-950 text-amber-300 text-[9px] font-mono border border-amber-800/60" x-text="activeModal.category"></span>
+            <span class="font-pixel text-xs text-amber-400" x-text="activeEvent?.title"></span>
+            <span class="px-2 py-0.5 rounded bg-amber-950 text-amber-300 text-[9px] font-mono border border-amber-800/60" x-text="activeEvent?.category"></span>
           </div>
-          <button @click="modalOpen = false" class="text-neutral-400 hover:text-white font-mono text-sm">[Esc]</button>
+          <button @click="modalType = null" class="text-neutral-400 hover:text-white font-mono text-sm">[Esc]</button>
         </div>
 
-        <p class="text-xs text-stone-300 italic border-l-2 border-amber-500/50 pl-3 py-1" x-text="activeModal.preamble"></p>
+        <p class="text-xs text-stone-300 italic border-l-2 border-amber-500/50 pl-3 py-1" x-text="activeEvent?.preamble"></p>
 
-        <!-- Narrative Dialogue Box -->
+        <!-- Narrative Dialogue -->
         <div class="bg-black/60 border border-neutral-800 rounded p-3 space-y-2 text-xs">
-          <template x-for="line in activeModal.dialogue" :key="line.speaker + line.text">
+          <template x-for="line in (activeEvent?.dialogue || [])" :key="line.speaker + line.text">
             <div>
               <strong class="text-amber-400 font-mono" x-text="line.speaker + ':'"></strong>
               <span class="text-neutral-200" x-text="' ' + line.text"></span>
@@ -303,10 +289,10 @@
           </template>
         </div>
 
-        <!-- Choice Deck with 1-3 Keyboard Buttons -->
+        <!-- Choice List -->
         <div class="space-y-2 pt-1">
-          <template x-for="(choice, cIdx) in activeModal.choices" :key="choice.label">
-            <button @click="resolveChoice(choice)"
+          <template x-for="(choice, cIdx) in (activeEvent?.choices || [])" :key="choice.label">
+            <button @click="resolveDilemmaChoice(choice)"
                     class="w-full text-left p-2.5 rounded bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 flex items-center justify-between text-xs transition group">
               <div>
                 <span class="font-bold text-neutral-100 group-hover:text-amber-400" x-text="choice.label"></span>
@@ -320,546 +306,70 @@
       </div>
     </div>
 
-    <!-- Mini-Game Full-Stage Overlay -->
-    <div x-show="miniGameActive" x-transition.opacity
-         class="absolute inset-0 bg-neutral-950 z-50 flex flex-col items-center justify-center p-4">
-      <div class="max-w-xl w-full bg-neutral-900 border-2 border-neutral-700 rounded-lg p-6 text-center space-y-4">
-        <h2 class="font-pixel text-base text-amber-400" x-text="cartridge === 'pacific_2026' ? 'SEAGULL & BIN CHICKEN DEFENCE' : 'PRAIRIE HUNTING GROUNDS'"></h2>
-        <p class="text-xs text-neutral-300 font-mono">
-          [Desktop Mouse Control Active] Click targets inside the virtual 800x400 canvas. 30s timer.
-        </p>
-        <div class="p-3 bg-black/50 border border-neutral-800 rounded font-mono text-xs flex justify-around text-neutral-400">
-          <span>Ammo Remaining: <strong class="text-white">24</strong></span>
-          <span>Carry Cap: <strong class="text-amber-400">20 Pkts</strong></span>
-          <span>Timer: <strong class="text-emerald-400">30s</strong></span>
+    <!-- OBSTACLE CROSSING MODAL -->
+    <div x-show="modalType === 'OBSTACLE' && activeObstacle" x-transition.opacity
+         class="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-neutral-900 border-2 border-blue-500/80 rounded-xl max-w-xl w-full p-5 shadow-2xl space-y-4">
+        <div class="border-b border-neutral-800 pb-2">
+          <h3 class="font-pixel text-xs text-blue-400" x-text="activeObstacle?.label || 'Obstacle Checkpoint'"></h3>
+          <p class="text-[11px] text-neutral-400 mt-1 font-mono">Evaluate depth & conditions before committing to crossing.</p>
         </div>
-        <button @click="miniGameActive = false" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded text-xs font-mono">
-          Return to Trail [Esc]
+
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <button @click="resolveObstacle('force')"
+                  class="p-3 bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 rounded text-left">
+            <div class="font-bold text-amber-400">[1] Force / Ford Crossing</div>
+            <div class="text-[10px] text-neutral-400 mt-1">Brave current. Risk losing traction & supplies.</div>
+          </button>
+          <button @click="resolveObstacle('adapt')"
+                  class="p-3 bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 rounded text-left">
+            <div class="font-bold text-emerald-400">[2] Caulk & Float / Detour</div>
+            <div class="text-[10px] text-neutral-400 mt-1">Carpenter / 4WD perks boost success.</div>
+          </button>
+          <button @click="resolveObstacle('pay')"
+                  class="p-3 bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 rounded text-left">
+            <div class="font-bold text-blue-400">[3] Ferry / Toll Road</div>
+            <div class="text-[10px] text-neutral-400 mt-1" x-text="'100% safe. Costs $' + ((activeObstacle?.costCents || 500) * (1 + (activeObstacle?.psi || 0.5)) / 100).toFixed(2)"></div>
+          </button>
+          <button @click="resolveObstacle('delay')"
+                  class="p-3 bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 rounded text-left">
+            <div class="font-bold text-neutral-300">[4] Camp / Wait for Conditions</div>
+            <div class="text-[10px] text-neutral-400 mt-1">Costs 1 day & rations. Depth/traffic shifts.</div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VICTORY / GAMEOVER SCREEN -->
+    <div x-show="modalType === 'VICTORY' || modalType === 'GAMEOVER'" x-transition.opacity
+         class="absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+      <div class="bg-neutral-900 border-2 rounded-xl max-w-md w-full p-6 text-center space-y-4"
+           :class="modalType === 'VICTORY' ? 'border-amber-400' : 'border-red-500'">
+        <h2 class="font-pixel text-base"
+            :class="modalType === 'VICTORY' ? 'text-amber-400' : 'text-red-500'"
+            x-text="modalType === 'VICTORY' ? 'ROUTE COMPLETED! VICTORY!' : 'EXPEDITION COLLAPSED'"></h2>
+
+        <p class="text-xs text-neutral-300 font-mono"
+           x-text="modalType === 'VICTORY' ? 'You arrived at the final destination.' : (cartridgeId === 'pacific_2026' ? 'Adults reached 0 Sanity. Emergency U-Turn initiated!' : 'All party members perished on the trail.')"></p>
+
+        <div class="p-3 bg-black/60 rounded border border-neutral-800 text-xs font-mono space-y-1">
+          <div>Distance: <strong x-text="ui.distance + ' ' + ui.distanceUnit"></strong></div>
+          <div>Turns Taken: <strong x-text="ui.turn"></strong></div>
+          <div>Final Score: <strong class="text-amber-400 text-sm" x-text="ui.score"></strong></div>
+        </div>
+
+        <button @click="switchCartridge(cartridgeId)"
+                class="w-full py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded font-mono text-xs">
+          Play Again [Enter]
         </button>
       </div>
     </div>
 
   </div>
 
-  <script>
-    function desktopInterface() {
-      return {
-        cartridge: 'pacific_2026',
-        crtEnabled: false,
-        soundMuted: false,
-        modalOpen: false,
-        miniGameActive: false,
-        fps: 60,
-        turnNumber: 1,
-        timeOfDay: 0.35, // 0 = dawn, 0.5 = noon, 0.8 = sunset, 1.0 = night
-        weather: 'Clear (26°C)',
-        pace: 'Sit-on-limit (100 km/h)',
-        rations: 'Normal',
-        distance: 55,
-        totalRouteDistance: 920,
-        distanceUnit: 'km',
-        nextWaypoint: 'Hawkesbury River Bridge (55 km)',
-        cashCents: 28550,
-        traction: 94,
-        dadEgo: 45,
-        vfxStinkLines: true,
-        lastLogMessage: 'Cruising north past Mooney Mooney Bridge. Arthur is staring peacefully into the distance...',
-
-        // Supplies
-        supplies: {
-          food: 42,
-          ammo: 24,
-          partA: 2,
-          partB: 1,
-          partC: 1
-        },
-
-        // Party
-        party: [],
-
-        // Active Dilemma
-        activeModal: {
-          title: 'EV_CODE_BROWN: The Newcastle Air Quality Crisis',
-          category: 'DYNAMIC HAZARD',
-          preamble: 'A sudden, warm sulfurous vapor rolls through the air vents past Mooney Mooney Bridge. Arthur is staring peacefully into the distance.',
-          dialogue: [
-            { speaker: 'Tegan', text: 'Brad. Do not look back, just crack the windows. Sweet mother of pearl, what did he eat at Heatherbrae?' },
-            { speaker: 'Brad', text: 'I told you that third custard pouch was an act of war! If that hits the upholstery, we are burning the car.' },
-            { speaker: 'Jack (6)', text: 'DAD! IT SMELLS LIKE A WET DOG COOKED ON A BARBECUE!' }
-          ],
-          choices: [
-            { label: 'Emergency Boot Change', description: 'Requires 1x Nappy Kit. Lose 30 mins (+1 Leg), preserves Adult Sanity. Arthur -> Clean.' },
-            { label: 'The 110 km/h Aerodynamic Venturi Gamble', description: 'Roll d100. 70% clears smell (+15 Dad Ego). 30% crosswind dirty wipe backlash.' },
-            { label: 'The Cannonball', description: 'Push full speed to next BP. Full progress, but Adults lose -30 Sanity.' }
-          ]
-        },
-
-        get currentSceneLabel() {
-          return this.cartridge === 'pacific_2026' ? 'M1 PACIFIC MOTORWAY' : 'THE OREGON TRAIL';
-        },
-
-        get partySubtitle() {
-          return this.cartridge === 'pacific_2026' ? 'Kia Carnival (6 Pax)' : 'Pioneer Wagon (5 Pax)';
-        },
-
-        get simTimeStr() {
-          return this.cartridge === 'pacific_2026' ? 'Leg 2 / 10:45 AM' : 'Day 14 / April 28';
-        },
-
-        get partyVitalityScore() {
-          if (!this.party.length) return 100;
-          const sum = this.party.reduce((acc, m) => acc + m.health, 0);
-          return Math.round(sum / this.party.length);
-        },
-
-        init() {
-          this.loadCartridgeRoster();
-          this.initAudioContext();
-          this.startCanvasRenderer();
-        },
-
-        switchCartridge(newCart) {
-          this.cartridge = newCart;
-          this.playBeep(440, 'triangle', 0.1);
-          if (newCart === 'oregon_1848') {
-            this.distance = 102;
-            this.totalRouteDistance = 2000;
-            this.distanceUnit = 'mi';
-            this.pace = 'Steady (15 mi/day)';
-            this.rations = 'Filling';
-            this.nextWaypoint = 'Kansas River Crossing (102 mi)';
-            this.cashCents = 80000;
-            this.supplies = { food: 250, ammo: 90, partA: 2, partB: 2, partC: 1 };
-            this.vfxStinkLines = false;
-            this.lastLogMessage = 'Departed Independence, Missouri. Wagons rolling across the tall grass prairies.';
-          } else {
-            this.distance = 55;
-            this.totalRouteDistance = 920;
-            this.distanceUnit = 'km';
-            this.pace = 'Sit-on-limit (100 km/h)';
-            this.rations = 'Normal';
-            this.nextWaypoint = 'Hawkesbury River Bridge (55 km)';
-            this.cashCents = 28550;
-            this.supplies = { food: 42, ammo: 24, partA: 2, partB: 1, partC: 1 };
-            this.vfxStinkLines = true;
-            this.lastLogMessage = 'M1 northbound merge cleared. Kids quiet for now with Freddo Frogs.';
-          }
-          this.loadCartridgeRoster();
-        },
-
-        loadCartridgeRoster() {
-          if (this.cartridge === 'pacific_2026') {
-            this.party = [
-              { name: 'Brad', role: 'primary', health: 85, status: 'Zen' },
-              { name: 'Tegan', role: 'primary', health: 90, status: 'Zen' },
-              { name: 'Jack (6)', role: 'secondary', health: 100, status: 'Happy' },
-              { name: 'Oliver (4)', role: 'secondary', health: 75, status: 'Restless' },
-              { name: 'Arthur (2)', role: 'secondary', health: 80, status: 'Code Brown' },
-              { name: 'Maple', role: 'pet', health: 100, status: 'Purring' }
-            ];
-          } else {
-            this.party = [
-              { name: 'Dave (Leader)', role: 'primary', health: 95, status: 'Healthy' },
-              { name: 'Sarah (Spouse)', role: 'primary', health: 90, status: 'Healthy' },
-              { name: 'Thomas', role: 'secondary', health: 85, status: 'Healthy' },
-              { name: 'Mary', role: 'secondary', health: 78, status: 'Tired' },
-              { name: 'Little Jed', role: 'secondary', health: 70, status: 'Feverish' }
-            ];
-          }
-        },
-
-        // Keyboard Navigation (Desktop Focus)
-        handleKeydown(e) {
-          // If modal open, map [1-3] and [Esc]
-          if (this.modalOpen) {
-            if (e.key === 'Escape') this.modalOpen = false;
-            if (e.key === '1' && this.activeModal.choices[0]) this.resolveChoice(this.activeModal.choices[0]);
-            if (e.key === '2' && this.activeModal.choices[1]) this.resolveChoice(this.activeModal.choices[1]);
-            if (e.key === '3' && this.activeModal.choices[2]) this.resolveChoice(this.activeModal.choices[2]);
-            return;
-          }
-
-          if (this.miniGameActive) {
-            if (e.key === 'Escape') this.miniGameActive = false;
-            return;
-          }
-
-          // Hotkeys in main console
-          if (e.code === 'Space') {
-            e.preventDefault();
-            this.advanceTurn();
-          } else if (e.key === 'r' || e.key === 'R') {
-            this.restTurn();
-          } else if (e.key === 'p' || e.key === 'P') {
-            this.cyclePace();
-          } else if (e.key === 'm' || e.key === 'M') {
-            this.toggleSound();
-          } else if (e.key === 'f' || e.key === 'F') {
-            this.toggleFullscreen();
-          } else if (e.key === 'e' || e.key === 'E') {
-            this.openSampleDilemma();
-          } else if (e.key === 'h' || e.key === 'H') {
-            this.triggerMiniGame();
-          }
-        },
-
-        advanceTurn() {
-          this.turnNumber++;
-          this.playBeep(330, 'sawtooth', 0.12);
-          const step = this.cartridge === 'pacific_2026' ? 45 : 18;
-          this.distance = Math.min(this.totalRouteDistance, this.distance + step);
-          this.timeOfDay = (this.timeOfDay + 0.1) % 1.0;
-
-          if (this.cartridge === 'pacific_2026') {
-            this.supplies.food = Math.max(0, this.supplies.food - 3);
-            this.lastLogMessage = `Travelled ${step} km north on the M1. Fuel consumption steady.`;
-          } else {
-            this.supplies.food = Math.max(0, this.supplies.food - 12);
-            this.lastLogMessage = `Covered ${step} miles today across the plains. Wagons in good order.`;
-          }
-        },
-
-        restTurn() {
-          this.turnNumber++;
-          this.playBeep(520, 'sine', 0.2);
-          this.party.forEach(m => m.health = Math.min(100, m.health + 10));
-          this.lastLogMessage = this.cartridge === 'pacific_2026'
-            ? 'Stopped at BP Twin Servos for Flat Whites and chicken tenders. Adults recovered +10 Sanity.'
-            : 'Camped by fresh water spring for full day of rest. Party morale recovered.';
-        },
-
-        cyclePace() {
-          this.playBeep(400, 'square', 0.08);
-          if (this.cartridge === 'pacific_2026') {
-            const paces = ['Cruise (80 km/h)', 'Sit-on-limit (100 km/h)', 'Hamish Mode (115 km/h)'];
-            const cur = paces.indexOf(this.pace);
-            this.pace = paces[(cur + 1) % paces.length];
-          } else {
-            const paces = ['Steady (15 mi/day)', 'Strenuous (20 mi/day)', 'Grueling (28 mi/day)'];
-            const cur = paces.indexOf(this.pace);
-            this.pace = paces[(cur + 1) % paces.length];
-          }
-          this.lastLogMessage = `Pacing adjusted to: ${this.pace}.`;
-        },
-
-        openSampleDilemma() {
-          this.playBeep(220, 'sawtooth', 0.25);
-          this.modalOpen = true;
-        },
-
-        resolveChoice(choice) {
-          this.modalOpen = false;
-          this.playFanfare();
-          this.lastLogMessage = `Choice executed: "${choice.label}". Arthur status updated.`;
-          const arthur = this.party.find(m => m.name.includes('Arthur'));
-          if (arthur) arthur.status = 'Clean';
-          this.vfxStinkLines = false;
-        },
-
-        triggerMiniGame() {
-          this.playBeep(600, 'square', 0.15);
-          this.miniGameActive = true;
-        },
-
-        toggleFullscreen() {
-          if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(() => {});
-          } else {
-            document.exitFullscreen().catch(() => {});
-          }
-        },
-
-        // Web Audio Procedural Synthesizer
-        audioCtx: null,
-        initAudioContext() {
-          // Lazy init on first user gesture
-          const unlock = () => {
-            if (!this.audioCtx) {
-              const AudioContext = window.AudioContext || window.webkitAudioContext;
-              if (AudioContext) this.audioCtx = new AudioContext();
-            }
-            if (this.audioCtx && this.audioCtx.state === 'suspended') {
-              this.audioCtx.resume();
-            }
-            window.removeEventListener('click', unlock);
-          };
-          window.addEventListener('click', unlock, { once: true });
-        },
-
-        toggleSound() {
-          this.soundMuted = !this.soundMuted;
-        },
-
-        playBeep(freq, type = 'sine', duration = 0.1) {
-          if (this.soundMuted || !this.audioCtx) return;
-          try {
-            const osc = this.audioCtx.createOscillator();
-            const gain = this.audioCtx.createGain();
-            osc.type = type;
-            osc.frequency.setValueAtTime(freq, this.audioCtx.currentTime);
-            gain.gain.setValueAtTime(0.15, this.audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + duration);
-            osc.connect(gain);
-            gain.connect(this.audioCtx.destination);
-            osc.start();
-            osc.stop(this.audioCtx.currentTime + duration);
-          } catch (e) {}
-        },
-
-        playFanfare() {
-          if (this.soundMuted || !this.audioCtx) return;
-          const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-          notes.forEach((freq, idx) => {
-            setTimeout(() => this.playBeep(freq, 'triangle', 0.18), idx * 110);
-          });
-        },
-
-        // 60 FPS Procedural Vector Canvas Loop
-        startCanvasRenderer() {
-          const canvas = document.getElementById('trailCanvas');
-          if (!canvas) return;
-          const ctx = canvas.getContext('2d');
-          let lastTime = performance.now();
-          let frameCount = 0;
-          let fpsTimer = performance.now();
-          let scrollX = 0;
-
-          const render = (now) => {
-            const dt = Math.min(0.05, (now - lastTime) / 1000);
-            lastTime = now;
-            scrollX += 60 * dt;
-
-            frameCount++;
-            if (now - fpsTimer >= 1000) {
-              this.fps = frameCount;
-              frameCount = 0;
-              fpsTimer = now;
-            }
-
-            // Virtual Viewport 800x400
-            ctx.clearRect(0, 0, 800, 400);
-
-            // 1. Sky Gradient based on Time of Day
-            const skyGrad = ctx.createLinearGradient(0, 0, 0, 240);
-            if (this.timeOfDay < 0.25) {
-              // Dawn
-              skyGrad.addColorStop(0, '#ff7e5f');
-              skyGrad.addColorStop(1, '#feb47b');
-            } else if (this.timeOfDay < 0.7) {
-              // Midday Blue
-              skyGrad.addColorStop(0, '#1a5276');
-              skyGrad.addColorStop(1, '#5dade2');
-            } else if (this.timeOfDay < 0.85) {
-              // Sunset
-              skyGrad.addColorStop(0, '#78281f');
-              skyGrad.addColorStop(0.5, '#e67e22');
-              skyGrad.addColorStop(1, '#f39c12');
-            } else {
-              // Night
-              skyGrad.addColorStop(0, '#0b132b');
-              skyGrad.addColorStop(1, '#1c2541');
-            }
-            ctx.fillStyle = skyGrad;
-            ctx.fillRect(0, 0, 800, 240);
-
-            // Sun / Celestial Arc
-            ctx.fillStyle = this.timeOfDay > 0.85 ? '#f4f6f7' : '#f9e79f';
-            const celestialX = 100 + (this.timeOfDay * 600);
-            const celestialY = 70 + Math.sin(this.timeOfDay * Math.PI) * -40;
-            ctx.beginPath();
-            ctx.arc(celestialX, celestialY, 14, 0, Math.PI * 2);
-            ctx.fill();
-
-            // 2. Parallax Layer 1: Distant Mountain Silhouettes (0.2x speed)
-            ctx.fillStyle = this.cartridge === 'pacific_2026' ? '#143628' : '#2c3e50';
-            const mOffset = (scrollX * 0.2) % 400;
-            ctx.beginPath();
-            ctx.moveTo(-mOffset, 240);
-            for (let x = -mOffset; x < 1200; x += 100) {
-              ctx.lineTo(x + 50, 160 + ((x % 70) * 0.6));
-              ctx.lineTo(x + 100, 240);
-            }
-            ctx.fill();
-
-            // 3. Parallax Layer 2: Midground Trees / Hills (0.5x speed)
-            ctx.fillStyle = this.cartridge === 'pacific_2026' ? '#1e5631' : '#196f3d';
-            const tOffset = (scrollX * 0.5) % 200;
-            ctx.beginPath();
-            ctx.moveTo(-tOffset, 245);
-            for (let x = -tOffset; x < 1000; x += 40) {
-              ctx.lineTo(x + 20, 210 + ((x % 30) * 0.5));
-              ctx.lineTo(x + 40, 245);
-            }
-            ctx.fill();
-
-            // 4. Foreground Ground & Road / Trail (1.0x speed)
-            if (this.cartridge === 'pacific_2026') {
-              // Asphalt Highway
-              ctx.fillStyle = '#212f3d';
-              ctx.fillRect(0, 240, 800, 160);
-
-              // Road Shoulder
-              ctx.fillStyle = '#17202a';
-              ctx.fillRect(0, 240, 800, 15);
-
-              // Dashed White Highway Lane Markings
-              ctx.fillStyle = '#fdfefe';
-              const laneOffset = (scrollX * 2.5) % 60;
-              for (let lx = -laneOffset; lx < 860; lx += 60) {
-                ctx.fillRect(lx, 310, 32, 5);
-              }
-            } else {
-              // Dirt & Prairie Grass
-              ctx.fillStyle = '#7d6608';
-              ctx.fillRect(0, 240, 800, 160);
-
-              // Trail rut markings
-              ctx.fillStyle = '#564504';
-              const rutOffset = (scrollX * 1.5) % 80;
-              for (let rx = -rutOffset; rx < 880; rx += 80) {
-                ctx.fillRect(rx, 290, 45, 4);
-                ctx.fillRect(rx + 20, 330, 45, 4);
-              }
-            }
-
-            // 5. Draw Hero Vehicle
-            if (this.cartridge === 'pacific_2026') {
-              this.drawSUV(ctx, 300, 240, now);
-            } else {
-              this.drawSchooner(ctx, 280, 235, now);
-            }
-
-            requestAnimationFrame(render);
-          };
-
-          requestAnimationFrame(render);
-        },
-
-        drawSUV(ctx, x, y, now) {
-          ctx.save();
-          const bounce = Math.sin(now / 120) * 1.5;
-
-          // Roof Cargo Pod
-          ctx.fillStyle = '#1c2833';
-          ctx.fillRect(x + 20, y - 24 + bounce, 70, 12);
-          ctx.fillStyle = '#e67e22'; // Orange strap
-          ctx.fillRect(x + 35, y - 25 + bounce, 3, 14);
-          ctx.fillRect(x + 70, y - 25 + bounce, 3, 14);
-
-          // SUV Chassis (Metallic Charcoal)
-          ctx.fillStyle = '#34495e';
-          ctx.beginPath();
-          ctx.roundRect(x, y - 12 + bounce, 120, 36, 6);
-          ctx.fill();
-
-          // SUV Cabin & Windows
-          ctx.fillStyle = '#1b2631';
-          ctx.beginPath();
-          ctx.moveTo(x + 15, y - 12 + bounce);
-          ctx.lineTo(x + 35, y - 22 + bounce);
-          ctx.lineTo(x + 95, y - 22 + bounce);
-          ctx.lineTo(x + 110, y - 12 + bounce);
-          ctx.closePath();
-          ctx.fill();
-
-          // Windows Tint
-          ctx.fillStyle = '#85c1e9';
-          ctx.fillRect(x + 38, y - 20 + bounce, 24, 8);
-          ctx.fillRect(x + 68, y - 20 + bounce, 24, 8);
-
-          // Headlights (Lit during twilight/night)
-          if (this.timeOfDay > 0.7 || this.timeOfDay < 0.2) {
-            ctx.fillStyle = 'rgba(255, 249, 196, 0.9)';
-            ctx.beginPath();
-            ctx.moveTo(x + 120, y + bounce);
-            ctx.lineTo(x + 240, y - 10 + bounce);
-            ctx.lineTo(x + 260, y + 40 + bounce);
-            ctx.lineTo(x + 120, y + 15 + bounce);
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(254, 249, 231, 0.25)';
-            ctx.fill();
-          }
-
-          // Spinning Alloy Wheels
-          const spin = (now / 40);
-          [x + 28, x + 96].forEach(wx => {
-            ctx.fillStyle = '#111';
-            ctx.beginPath();
-            ctx.arc(wx, y + 25 + bounce, 12, 0, Math.PI * 2);
-            ctx.fill();
-            // Rim
-            ctx.fillStyle = '#bdc3c7';
-            ctx.beginPath();
-            ctx.arc(wx, y + 25 + bounce, 6, 0, Math.PI * 2);
-            ctx.fill();
-          });
-
-          // Arthur's Stink Lines VFX (Wavy Bezier Curves)
-          if (this.vfxStinkLines) {
-            ctx.strokeStyle = 'rgba(88, 214, 141, 0.7)';
-            ctx.lineWidth = 2;
-            for (let i = 0; i < 3; i++) {
-              ctx.beginPath();
-              const sx = x + 70 + (i * 10);
-              const sy = y - 22 + bounce;
-              const wave = Math.sin((now / 150) + i) * 6;
-              ctx.moveTo(sx, sy);
-              ctx.bezierCurveTo(sx + wave, sy - 15, sx - wave, sy - 30, sx + (wave * 0.5), sy - 45);
-              ctx.stroke();
-            }
-          }
-
-          ctx.restore();
-        },
-
-        drawSchooner(ctx, x, y, now) {
-          ctx.save();
-          const bounce = Math.sin(now / 180) * 2;
-
-          // Wagon Canvas Bonnet (Prairie Schooner)
-          ctx.fillStyle = '#f5eef8';
-          ctx.beginPath();
-          ctx.ellipse(x + 45, y - 25 + bounce, 45, 28, 0, Math.PI, 0);
-          ctx.fill();
-          ctx.strokeStyle = '#d7bde2';
-          ctx.stroke();
-
-          // Wooden Wagon Bed
-          ctx.fillStyle = '#784212';
-          ctx.fillRect(x, y - 2 + bounce, 90, 16);
-
-          // Large Wooden Spoked Wheels
-          [x + 18, x + 75].forEach(wx => {
-            ctx.fillStyle = '#6e2c00';
-            ctx.beginPath();
-            ctx.arc(wx, y + 16 + bounce, 14, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#17202a';
-            ctx.beginPath();
-            ctx.arc(wx, y + 16 + bounce, 4, 0, Math.PI * 2);
-            ctx.fill();
-          });
-
-          // Yoked Walking Oxen Pair
-          const oxStep = Math.sin(now / 150) * 4;
-          ctx.fillStyle = '#512e10';
-          // Body
-          ctx.fillRect(x + 120, y - 4, 38, 20);
-          // Head & Horns
-          ctx.fillRect(x + 154, y - 14, 14, 18);
-          ctx.fillStyle = '#f4f6f7'; // Horns
-          ctx.fillRect(x + 158, y - 20, 3, 7);
-          // Legs
-          ctx.fillStyle = '#3a210a';
-          ctx.fillRect(x + 122 + oxStep, y + 16, 5, 14);
-          ctx.fillRect(x + 130 - oxStep, y + 16, 5, 14);
-          ctx.fillRect(x + 144 + oxStep, y + 16, 5, 14);
-          ctx.fillRect(x + 150 - oxStep, y + 16, 5, 14);
-
-          ctx.restore();
-        }
-      };
-    }
+  <script type="module">
+    import { createTrailApp } from '/static/js/ui/app.js';
+    window.trailApp = createTrailApp();
   </script>
 </body>
 </html>
