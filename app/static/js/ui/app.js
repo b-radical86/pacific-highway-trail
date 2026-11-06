@@ -43,7 +43,8 @@ export function createTrailApp() {
     crtEnabled: false,
     soundMuted: false,
     isTraveling: false,
-    modalType: null, // null | 'DILEMMA' | 'OBSTACLE' | 'OUTFITTER' | 'VICTORY' | 'GAMEOVER'
+    modalType: null, // null | 'DILEMMA' | 'OBSTACLE' | 'OUTFITTER' | 'VICTORY' | 'GAMEOVER' | 'EXIT'
+    warningModal: null, // null | { title, message, confirmLabel, cancelLabel, action }
 
     // Active Dilemma / Obstacle Data
     activeEvent: null,
@@ -180,7 +181,11 @@ export function createTrailApp() {
       sound.playBeep(440, 'triangle', 0.1);
       this.selectedOccupationIdx = idx;
       this.initEngine(this.cartridgeId, idx);
-      this.outfitterCart = { food: 6, ammo: 4, partA: 1, partB: 1, partC: 1 };
+      this.outfitterCart =
+        this.cartridgeId === 'pacific_2026'
+          ? { food: 6, ammo: 4, partA: 1, partB: 1, partC: 1 }
+          : { food: 8, ammo: 5, partA: 1, partB: 1, partC: 1 };
+      this.warningModal = null;
       this.screen = 'OUTFITTER';
     },
 
@@ -209,6 +214,30 @@ export function createTrailApp() {
         alert('Cart total exceeds available cash! Lower your quantities.');
         return;
       }
+
+      // Check for zero-food departure suicide
+      const catalog = this.cartridgeData.outfitter || [];
+      const foodItem = catalog.find((i) => i.id === 'food');
+      const foodPurchased = (this.outfitterCart.food || 0) * (foodItem?.bundleSize || 1);
+      const totalFoodAfterPurchase = (this._engine.supplies.food || 0) + foodPurchased;
+
+      if (totalFoodAfterPurchase <= 0) {
+        sound.playStinkBuzzer();
+        this.warningModal = {
+          title: 'DEPART WITH ZERO RATIONS?',
+          message:
+            'You have selected NO food rations! Your party will immediately suffer severe starvation damage (-15 Health, -20 Morale) upon hitting the road. Depart anyway?',
+          confirmLabel: 'Depart Anyway [Enter]',
+          cancelLabel: 'Return to Store [Esc]',
+          action: () => this._doDepart(),
+        };
+        return;
+      }
+
+      this._doDepart();
+    },
+
+    _doDepart() {
       this._engine.buySupplies(this.outfitterCart, this.cartridgeData.outfitter || []);
       sound.playFanfare();
       this.syncSnapshot();
@@ -267,6 +296,8 @@ export function createTrailApp() {
       if (this.isTraveling) return;
       sound.playBeep(440, 'triangle', 0.1);
       this.selectedOccupationIdx = 0;
+      this.outfitterCart = {};
+      this.warningModal = null;
       this.initEngine(newId, 0);
       if (this._canvasEngine) {
         this._canvasEngine.cartridgeId = newId;
@@ -322,10 +353,25 @@ export function createTrailApp() {
       });
     },
 
-    restTurn() {
+    restTurn(force = false) {
       if (this.isTraveling || this.modalType || this.ui.status !== 'IN_PROGRESS') return;
+
+      // Starvation confirmation: prevent accidental party wipe
+      if (!force && this._engine.supplies.food <= 0) {
+        sound.playStinkBuzzer();
+        this.warningModal = {
+          title: '⚠️ NO RATIONS REMAINING!',
+          message:
+            'Resting without food will inflict severe starvation damage (-15 Health, -20 Morale) to all living party members. Proceed with starvation rest?',
+          confirmLabel: 'Rest Anyway [Enter]',
+          cancelLabel: 'Cancel [Esc]',
+          action: () => this.restTurn(true),
+        };
+        return;
+      }
+
       const nextWp = this._engine.getNextWaypoint();
-      const isCommercial = Boolean(nextWp && nextWp.servoStop);
+      const isCommercial = Boolean(nextWp && (nextWp.servoStop || nextWp.tradingPost));
       const result = this._engine.executeRest(isCommercial);
 
       if (!result.success && result.reason === 'STARVATION') {
@@ -528,19 +574,18 @@ export function createTrailApp() {
         return;
       }
 
-      // Setup / Difficulty Selection Hotkeys
-      if (this.screen === 'SETUP') {
-        if (e.key === '1') this.selectDifficulty(0);
-        if (e.key === '2') this.selectDifficulty(1);
-        if (e.key === '3') this.selectDifficulty(2);
-        if (e.key === 'Enter') this.selectDifficulty(this.selectedOccupationIdx);
-        return;
-      }
-
-      // Outfitter Store Hotkeys
-      if (this.screen === 'OUTFITTER') {
-        if (e.key === 'Escape') this.screen = 'SETUP';
-        if (e.key === 'Enter') this.confirmOutfitterAndDepart();
+      // Warning / Confirmation Modal (Zero food departure or Starvation rest)
+      if (this.warningModal) {
+        if (e.key === 'Escape' || e.key === 'n' || e.key === 'N') {
+          this.warningModal = null;
+          return;
+        }
+        if (e.key === 'Enter' || e.key === 'y' || e.key === 'Y') {
+          const act = this.warningModal.action;
+          this.warningModal = null;
+          if (typeof act === 'function') act();
+          return;
+        }
         return;
       }
 
@@ -551,7 +596,33 @@ export function createTrailApp() {
         return;
       }
 
-      // Modal options 1-4 and Escape
+      // Screen-Gated Keyboard Router
+      if (this.screen === 'SETUP') {
+        this.handleSetupKeys(e);
+      } else if (this.screen === 'OUTFITTER') {
+        this.handleOutfitterKeys(e);
+      } else if (this.screen === 'GAME') {
+        this.handleTrailKeys(e);
+      }
+    },
+
+    handleSetupKeys(e) {
+      if (e.key === '1') this.selectDifficulty(0);
+      else if (e.key === '2') this.selectDifficulty(1);
+      else if (e.key === '3') this.selectDifficulty(2);
+      else if (e.key === 'Enter') this.selectDifficulty(this.selectedOccupationIdx);
+    },
+
+    handleOutfitterKeys(e) {
+      if (e.key === 'Escape') {
+        this.screen = 'SETUP';
+      } else if (e.key === 'Enter') {
+        this.confirmOutfitterAndDepart();
+      }
+    },
+
+    handleTrailKeys(e) {
+      // Modals during trail gameplay
       if (this.modalType === 'DILEMMA' && this.activeEvent) {
         if (e.key === 'Escape') this.modalType = null;
         if (e.key === '1' && this.activeEvent.choices[0]) this.resolveDilemmaChoice(this.activeEvent.choices[0]);

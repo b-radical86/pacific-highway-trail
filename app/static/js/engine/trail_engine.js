@@ -67,6 +67,8 @@ export class CoreTrailEngine {
     this.resolvedWaypoints = new Set(config.resolvedWaypoints || []);
     this.hazardCooldown = 0;
     this.consecutiveRests = 0;
+    this.occupationId = config.occupationId || null;
+    this.difficultyMultiplier = config.difficultyMultiplier ?? this.scoreMultiplier;
     this.perks = config.perks || {};
     this.status = 'IN_PROGRESS'; // 'IN_PROGRESS' | 'WON' | 'DIED' | 'U_TURN'
     this.dadEgo = 0;
@@ -262,19 +264,22 @@ export class CoreTrailEngine {
 
     // Travel Pace Attrition & Friction
     const isGrueling =
-      this.currentPaceKey === 'grueling' || this.currentPaceKey === 'hamish';
-    const isStrenuous = this.currentPaceKey === 'strenuous';
+      this.currentPaceKey === 'grueling' ||
+      this.currentPaceKey === 'hamish' ||
+      this.currentPaceKey === 'reckless';
+    const isStrenuous =
+      this.currentPaceKey === 'strenuous' || this.currentPaceKey === 'fast';
 
     if (isGrueling) {
       // High speed shreds tyres/traction and drains party stamina
-      this.traction = Math.max(20, this.traction - 5);
+      this.traction = Math.max(10, this.traction - 5);
       for (const m of activeParty) {
         m.morale = Math.max(0, (m.morale ?? 100) - 8);
         m.health = Math.max(0, m.health - 4);
       }
       this.logs.push('Grueling pace punished the party! -5 Traction, -8 Morale, -4 Health.');
     } else if (isStrenuous) {
-      this.traction = Math.max(30, this.traction - 2);
+      this.traction = Math.max(10, this.traction - 2);
       for (const m of activeParty) {
         m.morale = Math.max(0, (m.morale ?? 100) - 3);
       }
@@ -384,22 +389,31 @@ export class CoreTrailEngine {
     const foodConsumed = Math.min(this.supplies.food, foodNeeded);
     this.supplies.food -= foodConsumed;
 
-    // Commercial stop costs lodging fee ($25.00)
-    let commercialFeeCents = 0;
-    if (isCommercialStop && this.cashCents >= 2500) {
-      commercialFeeCents = 2500;
-      this.cashCents -= commercialFeeCents;
+    // Commercial stop fee check:
+    // 2026: Roadside Motel & Servo ($25.00 = 2500 cents)
+    // 1848: Trading Post / Roadhouse ($30.00 = 3000 cents)
+    const lodgingFeeCents = this.cartridgeId === 'pacific_2026' ? 2500 : 3000;
+    let commercialPaid = false;
+
+    if (isCommercialStop) {
+      if (this.cashCents >= lodgingFeeCents) {
+        this.cashCents -= lodgingFeeCents;
+        commercialPaid = true;
+      } else {
+        this.logs.push(
+          `Insufficient funds ($${(this.cashCents / 100).toFixed(2)} / $${(lodgingFeeCents / 100).toFixed(2)}) for commercial lodging! Turned away to rough roadside camping.`
+        );
+      }
     }
 
-    // Diminishing returns on resting in the wild:
-    // Turn 1: 100% healing (+14 HP, +16 Morale)
-    // Turn 2: 60% healing (+8 HP, +10 Morale)
-    // Turn 3+: 25% healing (+3 HP, +4 Morale) + cabin fever
-    const restEfficiency = isCommercialStop
-      ? 1.2
-      : Math.max(0.25, 1.0 - (this.consecutiveRests - 1) * 0.4);
-    const hpGain = Math.round(14 * restEfficiency);
-    const moraleGain = Math.round(16 * restEfficiency);
+    // Diminishing returns on resting in the wild / rough camping:
+    // Turn 1: 100% healing (+10 HP, +8 Morale)
+    // Turn 2: 60% healing (+6 HP, +5 Morale)
+    // Turn 3+: 25% healing (+3 HP, +2 Morale)
+    // Commercial Lodging (when paid): Fixed luxury rest (+16 HP, +20 Morale)
+    const wildEfficiency = Math.max(0.25, 1.0 - (this.consecutiveRests - 1) * 0.4);
+    const hpGain = commercialPaid ? 16 : Math.round(10 * wildEfficiency);
+    const moraleGain = commercialPaid ? 20 : Math.round(8 * wildEfficiency);
 
     for (const m of activeParty) {
       m.health = Math.min(100, m.health + hpGain);
@@ -411,19 +425,26 @@ export class CoreTrailEngine {
 
     const restLabel =
       this.cartridgeId === 'pacific_2026'
-        ? isCommercialStop
+        ? commercialPaid
           ? 'Checked into roadside motel & servo for hot showers.'
-          : 'Camped at roadside rest area.'
-        : isCommercialStop
-          ? 'Rented room at pioneer trading post.'
+          : 'Camped in the car at roadside rest area.'
+        : commercialPaid
+          ? 'Rented warm room at pioneer trading post.'
           : 'Camped wagon by the trail.';
 
     this.logs.push(
-      `${restLabel} Rations consumed: ${foodConsumed}. Healed +${hpGain} HP, +${moraleGain} Morale.`
+      `${restLabel} Rations consumed: ${foodConsumed}. Restored +${hpGain} HP, +${moraleGain} Morale.`
     );
 
     this.evaluateSurvivalStatus();
-    return { success: true, healed: true, hpGain, moraleGain, foodConsumed };
+    return {
+      success: true,
+      healed: true,
+      hpGain,
+      moraleGain,
+      foodConsumed,
+      commercialPaid,
+    };
   }
 
   /**

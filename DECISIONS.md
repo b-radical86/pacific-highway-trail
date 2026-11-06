@@ -47,3 +47,7 @@ Rationale: Resolves stationary crosshair reticle, replaces basic solid rectangle
 Date: 2026-11-06
 Decision: Implement difficulty selection (`screen: 'SETUP'`), pre-departure outfitter store (`screen: 'OUTFITTER'`), and anti-exploit survival mechanics (`executeRest` starvation attrition, diminishing returns, and pace wear).
 Rationale: Resolves trivial game completion by forcing upfront archetype/budget selection, eliminating infinite free healing when food is depleted, and enforcing realistic pace/starvation attrition.
+
+Date: 2026-11-06
+Decision: Harden keyboard routing (`handleSetupKeys`/`handleOutfitterKeys`/`handleTrailKeys`), patch commercial lodging loophole, add zero-food departure and starvation rest confirmation modals, and isolate outfitter cart across cartridge switches.
+Rationale: Resolves expert panel vulnerabilities (keyboard bleed during setup, free luxury lodging when bankrupt, accidental instant party wipes on zero rations, and cross-cartridge cart contamination).

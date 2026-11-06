@@ -275,15 +275,45 @@ if (member.health !== 65 || member.morale !== 60 || member.status !== 'Starving'
   throw new Error('Starvation health/morale/status penalty not applied correctly');
 }
 
-// Rest with food consumes rations and heals party (diminishing return on rest #2: 60% of 14 = 8)
+// Rest with food consumes rations and heals party (diminishing return on rest #2: 60% of 10 = 6)
 restEngine.supplies.food = 10;
 const healResult = restEngine.executeRest(false);
-if (!healResult.success || !healResult.healed || healResult.hpGain !== 8) {
+if (!healResult.success || !healResult.healed || healResult.hpGain !== 6) {
   throw new Error('Rest with food failed to heal: ' + JSON.stringify(healResult));
 }
 if (restEngine.supplies.food >= 10) throw new Error('Food was not consumed during rest');
-if (restEngine.party[0].health !== 73) {
+if (restEngine.party[0].health !== 71) {
   throw new Error('HP gain mismatch: ' + restEngine.party[0].health);
+}
+
+// Test C: Commercial rest with insufficient cash falls back to rough camping
+const bankruptEngine = new CoreTrailEngine({
+  cartridgeId: 'pacific_2026',
+  supplies: { food: 10, ammo: 0, partA: 0, partB: 0, partC: 0 },
+  cashCents: 500, // < 2500 cents
+  party: [{ name: 'Brad', role: 'primary', health: 50, morale: 50 }]
+});
+const brokeRest = bankruptEngine.executeRest(true);
+if (!brokeRest.success || brokeRest.commercialPaid !== false || brokeRest.hpGain !== 10) {
+  throw new Error('Bankrupt rest failed to downgrade: ' + JSON.stringify(brokeRest));
+}
+if (bankruptEngine.cashCents !== 500) {
+  throw new Error('Bankrupt rest deducted cash unfairly: ' + bankruptEngine.cashCents);
+}
+
+// Commercial rest with sufficient cash gets luxury healing (+16 HP, +20 Morale)
+const solventEngine = new CoreTrailEngine({
+  cartridgeId: 'pacific_2026',
+  supplies: { food: 10, ammo: 0, partA: 0, partB: 0, partC: 0 },
+  cashCents: 5000,
+  party: [{ name: 'Brad', role: 'primary', health: 50, morale: 50 }]
+});
+const luxuryRest = solventEngine.executeRest(true);
+if (!luxuryRest.success || luxuryRest.commercialPaid !== true || luxuryRest.hpGain !== 16) {
+  throw new Error('Solvent commercial rest failed: ' + JSON.stringify(luxuryRest));
+}
+if (solventEngine.cashCents !== 2500) {
+  throw new Error('Solvent commercial fee not deducted: ' + solventEngine.cashCents);
 }
 
 // 11. CoreTrailEngine: buySupplies outfitter store checkout
