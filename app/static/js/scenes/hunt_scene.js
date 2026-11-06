@@ -39,6 +39,7 @@ export class HuntScene {
     this.crosshairY = 200;
     this.recoil = 0;
     this.hoverTarget = null;
+    this.keyState = { up: false, down: false, left: false, right: false };
 
     // Particles & visual effects
     this.particles = [];
@@ -178,83 +179,157 @@ export class HuntScene {
   }
 
   /**
+   * Keyboard keydown dispatcher for directional aiming and trigger fire.
+   * @param {string} key Key code / name
+   * @returns {{ hit: boolean, target?: Object }|null}
+   */
+  handleKeyDown(key) {
+    if (key === 'ArrowUp' || key === 'w' || key === 'W') this.keyState.up = true;
+    else if (key === 'ArrowDown' || key === 's' || key === 'S') this.keyState.down = true;
+    else if (key === 'ArrowLeft' || key === 'a' || key === 'A') this.keyState.left = true;
+    else if (key === 'ArrowRight' || key === 'd' || key === 'D') this.keyState.right = true;
+    else if (key === ' ' || key === 'Enter') {
+      return this.handlePointerDown(this.crosshairX, this.crosshairY);
+    }
+    return null;
+  }
+
+  /**
+   * Keyboard keyup dispatcher to release directional velocity.
+   * @param {string} key Key code / name
+   */
+  handleKeyUp(key) {
+    if (key === 'ArrowUp' || key === 'w' || key === 'W') this.keyState.up = false;
+    else if (key === 'ArrowDown' || key === 's' || key === 'S') this.keyState.down = false;
+    else if (key === 'ArrowLeft' || key === 'a' || key === 'A') this.keyState.left = false;
+    else if (key === 'ArrowRight' || key === 'd' || key === 'D') this.keyState.right = false;
+  }
+
+  /**
    * Pointer down click handling with normalized virtual coordinates.
-   * Enforces minimum 22px hit radius for accessibility and touch parity.
+   * Enforces minimum 24px hit radius for accessibility and touch parity.
    *
    * @param {number} vx Virtual X (0 - 800)
    * @param {number} vy Virtual Y (0 - 400)
-   * @returns {{ hit: boolean, type?: string }}
+   * @returns {{ hit: boolean, target?: Object, reason?: string }}
    */
   handlePointerDown(vx, vy) {
-    if (!this.isActive || this.ammo <= 0) return { hit: false };
+    if (!this.isActive) return { hit: false };
 
-    this.ammo -= 1;
-    this.ammoSpent += 1;
+    // In 1848: requires ammunition to fire rifle
+    if (this.cartridgeId === 'oregon_1848' && this.ammo <= 0) {
+      this.floatingTexts.push({
+        x: vx,
+        y: vy - 15,
+        text: 'NO AMMO!',
+        color: '#ef4444',
+        life: 0.8,
+      });
+      return { hit: false, reason: 'NO_AMMO' };
+    }
+
     this.crosshairX = vx;
     this.crosshairY = vy;
     this.recoil = 1.0; // Trigger punchy crosshair recoil animation
 
     // Impact muzzle flash / hit ring
-    this.shotFlashes.push({ x: vx, y: vy, life: 0.22, r: 16 });
+    this.shotFlashes.push({ x: vx, y: vy, life: 0.22, r: 18 });
 
-    const minHitRadius = 22;
+    const minHitRadius = 24;
     let hitSomething = false;
+    let hitTarget = null;
 
     for (let i = this.entities.length - 1; i >= 0; i--) {
       const ent = this.entities[i];
       const dist = Math.hypot(vx - ent.x, vy - ent.y);
-      const effectiveRadius = Math.max(minHitRadius, ent.r);
+      const effectiveRadius = Math.max(minHitRadius, ent.r + 4);
 
       if (dist <= effectiveRadius) {
         hitSomething = true;
+        hitTarget = ent;
         this.entities.splice(i, 1);
-
-        if (ent.yieldFood) {
-          this.foodHarvested += ent.yieldFood;
-          const unit = this.cartridgeId === 'pacific_2026' ? 'Snacks' : 'lbs';
-          this.floatingTexts.push({
-            x: vx,
-            y: vy - 18,
-            text: `+${ent.yieldFood} ${unit}`,
-            color: '#4ade80',
-            life: 1.0,
-          });
-          // Pastry crumb / meat particles
-          this._spawnParticles(vx, vy, '#d97706', 7, 60);
-        } else if (ent.yieldSanity) {
-          this.sanityGained += ent.yieldSanity;
-          this.floatingTexts.push({
-            x: vx,
-            y: vy - 18,
-            text: `+${ent.yieldSanity} Sanity ☕`,
-            color: '#38bdf8',
-            life: 1.0,
-          });
-          // Coffee droplet particles
-          this._spawnParticles(vx, vy, '#60a5fa', 8, 55);
-        } else if (ent.isThreat) {
-          const soundText =
-            ent.type === 'IBIS' ? 'SHOO! (HONK!)' : 'SHOO! (SQUAWK!)';
-          this.floatingTexts.push({
-            x: vx,
-            y: vy - 18,
-            text: soundText,
-            color: '#facc15',
-            life: 0.9,
-          });
-          // Feather burst particles
-          this._spawnParticles(vx, vy, '#f8fafc', 10, 80, true);
-        }
-
         break;
       }
     }
 
-    if (this.ammo <= 0) {
+    if (this.cartridgeId === 'oregon_1848') {
+      // 1848 always expends 1 bullet per shot
+      this.ammo = Math.max(0, this.ammo - 1);
+      this.ammoSpent += 1;
+    } else {
+      // 2026 Rest-Stop Defence:
+      // Picking up Food/Coffee does NOT cost coins/chips!
+      // Shooing birds spends 1 distraction coin/chip if available.
+      if (hitTarget?.isThreat) {
+        if (this.ammo > 0) {
+          this.ammo -= 1;
+          this.ammoSpent += 1;
+        }
+      } else if (!hitTarget) {
+        // Missed in empty air in 2026: don't silently waste coins, show whiff feedback
+        this.floatingTexts.push({
+          x: vx,
+          y: vy - 10,
+          text: 'WHIFF!',
+          color: '#94a3b8',
+          life: 0.6,
+        });
+      }
+    }
+
+    if (hitSomething && hitTarget) {
+      if (hitTarget.yieldFood) {
+        this.foodHarvested += hitTarget.yieldFood;
+        const unit = this.cartridgeId === 'pacific_2026' ? 'Snacks' : 'lbs';
+        this.floatingTexts.push({
+          x: vx,
+          y: vy - 18,
+          text: `+${hitTarget.yieldFood} ${unit}`,
+          color: '#4ade80',
+          life: 1.0,
+        });
+        // Pastry crumb / food particles
+        this._spawnParticles(vx, vy, '#d97706', 7, 60);
+      } else if (hitTarget.yieldSanity) {
+        this.sanityGained += hitTarget.yieldSanity;
+        this.floatingTexts.push({
+          x: vx,
+          y: vy - 18,
+          text: `+${hitTarget.yieldSanity} Sanity ☕`,
+          color: '#38bdf8',
+          life: 1.0,
+        });
+        // Coffee droplet particles
+        this._spawnParticles(vx, vy, '#60a5fa', 8, 55);
+      } else if (hitTarget.isThreat) {
+        const soundText =
+          hitTarget.type === 'IBIS' ? 'SHOO! (HONK!)' : 'SHOO! (SQUAWK!)';
+        this.floatingTexts.push({
+          x: vx,
+          y: vy - 18,
+          text: soundText,
+          color: '#facc15',
+          life: 0.9,
+        });
+        // Feather burst particles
+        this._spawnParticles(vx, vy, '#f8fafc', 10, 80, true);
+      }
+    } else if (this.cartridgeId === 'oregon_1848') {
+      this.floatingTexts.push({
+        x: vx,
+        y: vy - 10,
+        text: 'MISS!',
+        color: '#94a3b8',
+        life: 0.6,
+      });
+    }
+
+    // In 1848, end when ammo is completely exhausted
+    if (this.cartridgeId === 'oregon_1848' && this.ammo <= 0) {
       this._endGame();
     }
 
-    return { hit: hitSomething };
+    return { hit: hitSomething, target: hitTarget };
   }
 
   _spawnParticles(x, y, color, count, speed, isFeather = false) {
@@ -286,6 +361,21 @@ export class HuntScene {
 
     this.animTime += dt;
     this.recoil = Math.max(0, this.recoil - dt * 5.0);
+
+    // Smooth keyboard crosshair traversal
+    let kx = 0;
+    let ky = 0;
+    if (this.keyState.up) ky -= 1;
+    if (this.keyState.down) ky += 1;
+    if (this.keyState.left) kx -= 1;
+    if (this.keyState.right) kx += 1;
+
+    if (kx !== 0 || ky !== 0) {
+      const len = Math.hypot(kx, ky);
+      const speed = 480;
+      this.crosshairX = Math.max(15, Math.min(785, this.crosshairX + (kx / len) * speed * dt));
+      this.crosshairY = Math.max(65, Math.min(385, this.crosshairY + (ky / len) * speed * dt));
+    }
 
     // Update timer
     this.timer = Math.max(0, this.timer - dt);

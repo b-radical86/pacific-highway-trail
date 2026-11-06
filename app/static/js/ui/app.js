@@ -491,13 +491,17 @@ export function createTrailApp() {
 
       this._canvasEngine.activeScene = hunt;
 
-      // Attach pointer handlers to canvas
-      if (canvas) {
+      // Attach pointer handlers to container / canvas
+      const container = canvas?.parentElement;
+      const targetEl = container || canvas;
+
+      if (targetEl) {
         const pointerDownHandler = (e) => {
           if (!this.miniGameActive || this._canvasEngine.activeScene !== hunt) {
             if (cleanupListeners) cleanupListeners();
             return;
           }
+          e.preventDefault();
           const v = this._canvasEngine.toVirtualCoords(e.clientX, e.clientY);
           if (this.cartridgeId === 'oregon_1848') sound.playMusket();
           else sound.playHonk();
@@ -514,13 +518,13 @@ export function createTrailApp() {
         };
 
         cleanupListeners = () => {
-          canvas.removeEventListener('pointerdown', pointerDownHandler);
-          canvas.removeEventListener('pointermove', pointerMoveHandler);
-          canvas.style.cursor = '';
+          targetEl.removeEventListener('pointerdown', pointerDownHandler);
+          targetEl.removeEventListener('pointermove', pointerMoveHandler);
+          if (canvas) canvas.style.cursor = '';
         };
 
-        canvas.addEventListener('pointerdown', pointerDownHandler);
-        canvas.addEventListener('pointermove', pointerMoveHandler);
+        targetEl.addEventListener('pointerdown', pointerDownHandler);
+        targetEl.addEventListener('pointermove', pointerMoveHandler);
       }
     },
 
@@ -564,11 +568,40 @@ export function createTrailApp() {
     handleKeydown(e) {
       sound.unlock();
 
-      // In mini-game, allow Escape to exit
+      // In mini-game, handle keyboard aiming and firing
       if (this.miniGameActive) {
         if (e.key === 'Escape') {
           if (this._canvasEngine && this._canvasEngine.activeScene) {
             this._canvasEngine.activeScene._endGame();
+          }
+          return;
+        }
+
+        const scene = this._canvasEngine?.activeScene;
+        if (scene && typeof scene.handleKeyDown === 'function') {
+          if (e.code === 'Space' || e.key === 'Enter') {
+            e.preventDefault();
+            if (this.cartridgeId === 'oregon_1848') sound.playMusket();
+            else sound.playHonk();
+            scene.handleKeyDown(' ');
+          } else if (
+            [
+              'ArrowUp',
+              'ArrowDown',
+              'ArrowLeft',
+              'ArrowRight',
+              'w',
+              'W',
+              's',
+              'S',
+              'a',
+              'A',
+              'd',
+              'D',
+            ].includes(e.key)
+          ) {
+            e.preventDefault();
+            scene.handleKeyDown(e.key);
           }
         }
         return;
@@ -603,6 +636,15 @@ export function createTrailApp() {
         this.handleOutfitterKeys(e);
       } else if (this.screen === 'GAME') {
         this.handleTrailKeys(e);
+      }
+    },
+
+    handleKeyup(e) {
+      if (this.miniGameActive) {
+        const scene = this._canvasEngine?.activeScene;
+        if (scene && typeof scene.handleKeyUp === 'function') {
+          scene.handleKeyUp(e.key);
+        }
       }
     },
 

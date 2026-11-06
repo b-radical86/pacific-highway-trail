@@ -51,3 +51,7 @@ Rationale: Resolves trivial game completion by forcing upfront archetype/budget 
 Date: 2026-11-06
 Decision: Harden keyboard routing (`handleSetupKeys`/`handleOutfitterKeys`/`handleTrailKeys`), patch commercial lodging loophole, add zero-food departure and starvation rest confirmation modals, and isolate outfitter cart across cartridge switches.
 Rationale: Resolves expert panel vulnerabilities (keyboard bleed during setup, free luxury lodging when bankrupt, accidental instant party wipes on zero rations, and cross-cartridge cart contamination).
+
+Date: 2026-11-07
+Decision: Overhaul Rest-Stop Defence and Hunting controls with dual hybrid input (Mouse + Keyboard WASD/Arrows aiming and Space/Enter firing), ammo economy protection (free snack collection & miss whiff feedback), and an on-screen controls/targets legend side panel.
+Rationale: Resolves broken control feel where keyboard inputs were ignored, ammo was drained on empty clicks, and players lacked clear on-screen guidance on mouse vs keyboard mechanics.

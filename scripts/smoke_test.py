@@ -244,6 +244,16 @@ pacificHunt.handlePointerMove(320, 210);
 pacificHunt.update(0.05);
 pacificHunt.render(mockCtx, 800, 400);
 
+// Keyboard aiming & firing assertions
+pacificHunt.handleKeyDown('ArrowRight');
+if (!pacificHunt.keyState.right) throw new Error('Key down state failed');
+pacificHunt.update(0.1);
+if (pacificHunt.crosshairX <= 320) throw new Error('Keyboard crosshair movement failed');
+pacificHunt.handleKeyUp('ArrowRight');
+if (pacificHunt.keyState.right) throw new Error('Key up state failed');
+const keyHit = pacificHunt.handleKeyDown(' ');
+if (typeof keyHit !== 'object') throw new Error('Keyboard fire return mismatch');
+
 // 9. StorageManager serialization & offline fallback
 import { StorageManager } from './app/static/js/engine/storage.js';
 const mockStore = {};
