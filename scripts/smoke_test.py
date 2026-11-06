@@ -171,6 +171,7 @@ const mockCtx = {
   restore: () => {},
   translate: () => {},
   rotate: () => {},
+  scale: () => {},
 };
 const mockCanvas = {
   width: 800,
@@ -226,12 +227,22 @@ const hunt = new HuntScene({
 hunt.entities.push({
   type: 'BISON', x: 400, y: 200, vx: 10, r: 28, yieldFood: 200, color: '#000'
 });
+hunt.handlePointerMove(402, 201);
+if (hunt.crosshairX !== 402 || hunt.crosshairY !== 201) {
+  throw new Error('Crosshair tracking failed');
+}
 const hitReceipt = hunt.handlePointerDown(402, 201);
 if (!hitReceipt.hit || hunt.foodHarvested !== 200) throw new Error('Hunt hit failed');
 while (hunt.ammo > 0) hunt.handlePointerDown(10, 10);
 if (!huntResult || huntResult.foodYield !== 100) {
   throw new Error('Carry cap failed to limit food to 100');
 }
+
+// 2026 Rest-Stop Defence scene & render verification
+const pacificHunt = new HuntScene({ cartridgeId: 'pacific_2026', ammo: 10 });
+pacificHunt.handlePointerMove(320, 210);
+pacificHunt.update(0.05);
+pacificHunt.render(mockCtx, 800, 400);
 
 // 9. StorageManager serialization & offline fallback
 import { StorageManager } from './app/static/js/engine/storage.js';

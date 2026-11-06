@@ -353,18 +353,27 @@ export function createTrailApp() {
       this.miniGameActive = true;
       this.modalType = null;
 
+      const canvas = document.getElementById('trailCanvas');
+      if (canvas) canvas.style.cursor = 'none';
+
+      let cleanupListeners = null;
+
       const hunt = new HuntScene({
         cartridgeId: this.cartridgeId,
         ammo: this._engine.supplies.ammo,
         onComplete: (result) => {
           this._canvasEngine.activeScene = null;
           this.miniGameActive = false;
+          if (cleanupListeners) cleanupListeners();
 
           // Commit harvested gains
           this._engine.supplies.food += result.foodYield;
-          this._engine.supplies.ammo = Math.max(0, this._engine.supplies.ammo - result.ammoSpent);
+          this._engine.supplies.ammo = Math.max(
+            0,
+            this._engine.supplies.ammo - result.ammoSpent
+          );
           if (result.sanityGained) {
-            this._engine.party.forEach(m => {
+            this._engine.party.forEach((m) => {
               if (m.role === 'primary' && m.health > 0) {
                 m.morale = Math.min(100, (m.morale ?? 100) + result.sanityGained);
               }
@@ -382,19 +391,37 @@ export function createTrailApp() {
 
       this._canvasEngine.activeScene = hunt;
 
-      // Attach pointer handler to canvas
-      const canvas = document.getElementById('trailCanvas');
-      const pointerHandler = (e) => {
-        if (!this.miniGameActive || this._canvasEngine.activeScene !== hunt) {
-          canvas.removeEventListener('pointerdown', pointerHandler);
-          return;
-        }
-        const v = this._canvasEngine.toVirtualCoords(e.clientX, e.clientY);
-        if (this.cartridgeId === 'oregon_1848') sound.playMusket();
-        else sound.playHonk();
-        hunt.handlePointerDown(v.x, v.y);
-      };
-      canvas.addEventListener('pointerdown', pointerHandler);
+      // Attach pointer handlers to canvas
+      if (canvas) {
+        const pointerDownHandler = (e) => {
+          if (!this.miniGameActive || this._canvasEngine.activeScene !== hunt) {
+            if (cleanupListeners) cleanupListeners();
+            return;
+          }
+          const v = this._canvasEngine.toVirtualCoords(e.clientX, e.clientY);
+          if (this.cartridgeId === 'oregon_1848') sound.playMusket();
+          else sound.playHonk();
+          hunt.handlePointerDown(v.x, v.y);
+        };
+
+        const pointerMoveHandler = (e) => {
+          if (!this.miniGameActive || this._canvasEngine.activeScene !== hunt) {
+            if (cleanupListeners) cleanupListeners();
+            return;
+          }
+          const v = this._canvasEngine.toVirtualCoords(e.clientX, e.clientY);
+          hunt.handlePointerMove(v.x, v.y);
+        };
+
+        cleanupListeners = () => {
+          canvas.removeEventListener('pointerdown', pointerDownHandler);
+          canvas.removeEventListener('pointermove', pointerMoveHandler);
+          canvas.style.cursor = '';
+        };
+
+        canvas.addEventListener('pointerdown', pointerDownHandler);
+        canvas.addEventListener('pointermove', pointerMoveHandler);
+      }
     },
 
     toggleSound() {

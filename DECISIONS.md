@@ -39,3 +39,7 @@ Rationale: Allows one-click desktop launching without terminal interaction and g
 Date: 2026-11-06
 Decision: Vendor Alpine.js ESM build (`/static/vendor/alpine.esm.js`) and initialize via explicit `Alpine.data()` and `Alpine.start()` within the module bundle.
 Rationale: Resolves browser evaluation race condition where deferred CDN script initialized `x-data` before ES module evaluation, restoring instant reactive data binding and offline reliability.
+
+Date: 2026-11-06
+Decision: Overhaul Rest-Stop Defence / Hunting mini-game (`hunt_scene.js`) with real-time pointer tracking, animated crosshair reticle, dynamic lock-on state, and rich procedural vector artwork.
+Rationale: Resolves stationary crosshair reticle, replaces basic solid rectangles with high-detail coastal rest stop scenery (picnic table, wheelie bin, surf waves), animated flapping birds, and particle bursts.
