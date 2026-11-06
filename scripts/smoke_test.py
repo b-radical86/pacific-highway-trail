@@ -53,6 +53,8 @@ import { EventManager } from './app/static/js/engine/event_manager.js';
 import { OREGON_1848_CARTRIDGE } from './app/static/js/cartridges/oregon_1848.js';
 import { PACIFIC_2026_CARTRIDGE } from './app/static/js/cartridges/pacific_2026.js';
 import { CanvasEngine } from './app/static/js/canvas/canvas_engine.js';
+import { RiverScene } from './app/static/js/scenes/river_scene.js';
+import { HuntScene } from './app/static/js/scenes/hunt_scene.js';
 
 // 1. PRNG determinism & state restore
 const prng1 = new PRNG(12345);
@@ -198,6 +200,38 @@ if (!ops.includes('bezier')) throw new Error('Expected bezier stink lines in 202
 ce.cartridgeId = 'oregon_1848';
 ce.weather = 'RAIN';
 ce.renderFrame();
+
+// 7. RiverScene & Columbia Rafting mini-game
+const river = new RiverScene({
+  cartridgeId: 'oregon_1848',
+  obstacle: { phi: 0.4, psi: 0.5, costCents: 500, label: 'Kansas River' }
+});
+river.startCrossingAnimation(true, 'Passed');
+for (let i = 0; i < 30; i++) river.update(0.1);
+if (river.state !== 'RESOLVED') throw new Error('River did not resolve');
+
+const raft = new RiverScene({ cartridgeId: 'oregon_1848', isRaftingMiniGame: true });
+raft.handlePointerDown(250, 200);
+if (raft.raftX !== 250) throw new Error('Raft steer failed');
+for (let i = 0; i < 160; i++) raft.update(0.1);
+if (raft.raftTimer !== 0 || raft.state !== 'RESOLVED') throw new Error('Rafting did not end');
+
+// 8. HuntScene pointer targets & carry cap
+let huntResult = null;
+const hunt = new HuntScene({
+  cartridgeId: 'oregon_1848',
+  ammo: 5,
+  onComplete: (res) => { huntResult = res; }
+});
+hunt.entities.push({
+  type: 'BISON', x: 400, y: 200, vx: 10, r: 28, yieldFood: 200, color: '#000'
+});
+const hitReceipt = hunt.handlePointerDown(402, 201);
+if (!hitReceipt.hit || hunt.foodHarvested !== 200) throw new Error('Hunt hit failed');
+while (hunt.ammo > 0) hunt.handlePointerDown(10, 10);
+if (!huntResult || huntResult.foodYield !== 100) {
+  throw new Error('Carry cap failed to limit food to 100');
+}
 
 console.log('NODE_ESM_ASSERTIONS_PASSED');
 """

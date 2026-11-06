@@ -19,3 +19,7 @@ Rationale: Enables completely declarative hazard/opportunity execution across bo
 Date: 2026-11-06
 Decision: Implement Phase 3 procedural 2D vector canvas pipeline (`canvas_engine.js`, `renderers_1848.js`, `renderers_2026.js`) with DPR scaling, cached sky gradients, phased travel animation hooks, and coordinate normalization.
 Rationale: Guarantees 60 FPS zero-allocation vector rendering across both cartridges, accurate letterbox pointer mapping, and complete decoupling from Alpine DOM reactivity.
+
+Date: 2026-11-06
+Decision: Implement Phase 4 interactive obstacle crossings (`river_scene.js`) and 30-second pointer-normalized target mini-games (`hunt_scene.js`).
+Rationale: Delivers cartridge-adaptive river/gridlock obstacle physics, The Dalles canyon rapids steering, and touch/pointer-safe hunting/rest-stop defence with authentic carry caps.
