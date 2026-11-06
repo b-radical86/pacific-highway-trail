@@ -39,3 +39,57 @@ class HealthCheckResponse(BaseModel):
         default_factory=dict,
         description="Extensible metadata and diagnostic metrics",
     )
+
+
+class LeaderboardSubmissionRequest(BaseModel):
+    """Contract for submitting run results to SQLite persistence."""
+
+    cartridge_id: str = Field(
+        pattern=r"^(oregon_1848|pacific_2026)$",
+        description="Target cartridge identifier",
+    )
+    player_name: str = Field(
+        min_length=1,
+        max_length=50,
+        description="Display name of player or party leader",
+    )
+    score: int = Field(ge=0, le=50000, description="Calculated final run score")
+    turns: int = Field(ge=1, le=1000, description="Total turns elapsed during run")
+    distance: float = Field(ge=0.0, le=3000.0, description="Distance traveled along trail")
+    status: str = Field(
+        pattern=r"^(WON|DIED|U_TURN)$",
+        description="Final run outcome status",
+    )
+    epitaph: str | None = Field(
+        default=None,
+        max_length=140,
+        description="Roadside tombstone or memorial message",
+    )
+
+
+class LeaderboardEntry(BaseModel):
+    """Single leaderboard or memorial tombstone record."""
+
+    id: int = Field(description="Database primary key")
+    cartridge_id: str = Field(description="Cartridge identifier")
+    player_name: str = Field(description="Player or party name")
+    score: int = Field(description="Final score")
+    turns: int = Field(description="Turns taken")
+    distance: float = Field(description="Distance reached")
+    status: str = Field(description="Outcome status (WON, DIED, U_TURN)")
+    recorded_at: str = Field(description="ISO timestamp of completion")
+    epitaph: str | None = Field(default=None, description="Memorial epitaph message")
+
+
+class LeaderboardResponse(BaseModel):
+    """Aggregate leaderboard and roadside memorials response."""
+
+    cartridge_id: str = Field(description="Cartridge identifier")
+    high_scores: list[LeaderboardEntry] = Field(
+        default_factory=list,
+        description="Top scores ordered descending",
+    )
+    memorials: list[LeaderboardEntry] = Field(
+        default_factory=list,
+        description="Past roadside memorials and tombstones",
+    )

@@ -5,9 +5,11 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+import sqlite3
+from typing import Annotated, Any
 import uuid
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -17,8 +19,20 @@ from app.core.guardrails import (
     init_wal_sqlite,
     run_startup_self_check,
 )
-from app.db import init_db
-from app.schemas import HealthCheckResponse, StartupStatus
+from app.db import (
+    get_db,
+    get_leaderboard_entries,
+    get_memorial_entries,
+    init_db,
+    insert_leaderboard_entry,
+)
+from app.schemas import (
+    HealthCheckResponse,
+    LeaderboardEntry,
+    LeaderboardResponse,
+    LeaderboardSubmissionRequest,
+    StartupStatus,
+)
 
 settings = get_settings()
 
@@ -111,6 +125,103 @@ async def health_check() -> HealthCheckResponse:
             "db_path": str(settings.db_path),
             "error_log_path": str(settings.error_log_path),
         },
+    )
+
+
+def validate_run_kinematics(sub: LeaderboardSubmissionRequest) -> None:
+    """Enforces server-side simulation sanity and anti-tampering bounds."""
+    if sub.cartridge_id == "oregon_1848":
+        max_trail_distance = 2500.0
+        max_speed_per_turn = 60.0  # Max daily kinematics <= 60 miles/turn
+        min_win_distance = 1950.0  # Willamette Valley threshold
+        min_win_turns = 15
+    elif sub.cartridge_id == "pacific_2026":
+        max_trail_distance = 1200.0
+        max_speed_per_turn = 250.0  # Max freeway speed per step <= 250 km/turn
+        min_win_distance = 900.0  # Brisbane threshold
+        min_win_turns = 4
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported cartridge identifier")
+
+    if sub.distance > max_trail_distance:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Distance {sub.distance} exceeds max trail limit of {max_trail_distance}",
+        )
+
+    avg_speed = sub.distance / max(sub.turns, 1)
+    if avg_speed > max_speed_per_turn:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Average speed {avg_speed:.1f}/turn violates kinematic ceiling "
+                f"({max_speed_per_turn})"
+            ),
+        )
+
+    if sub.status == "WON":
+        if sub.distance < min_win_distance:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Won run requires distance >= {min_win_distance}, got {sub.distance}",
+            )
+        if sub.turns < min_win_turns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Won run requires at least {min_win_turns} turns, got {sub.turns}",
+            )
+
+    if sub.score > 35000:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Score {sub.score} exceeds maximum possible simulation score",
+        )
+
+
+@app.post("/api/leaderboard", tags=["Leaderboard"])
+async def submit_leaderboard(
+    submission: LeaderboardSubmissionRequest,
+    conn: Annotated[sqlite3.Connection, Depends(get_db)],
+) -> dict[str, Any]:
+    """Validates run kinematics and records final score and memorial into SQLite."""
+    validate_run_kinematics(submission)
+    recorded_at = datetime.now(timezone.utc).isoformat()
+    row_id = insert_leaderboard_entry(
+        conn=conn,
+        cartridge_id=submission.cartridge_id,
+        player_name=submission.player_name,
+        score=submission.score,
+        turns=submission.turns,
+        distance=submission.distance,
+        status=submission.status,
+        recorded_at=recorded_at,
+        epitaph=submission.epitaph,
+    )
+    return {
+        "status": "recorded",
+        "id": row_id,
+        "score": submission.score,
+        "recorded_at": recorded_at,
+    }
+
+
+@app.get("/api/leaderboard", response_model=LeaderboardResponse, tags=["Leaderboard"])
+async def get_leaderboard(
+    cartridge_id: Annotated[
+        str,
+        Query(pattern=r"^(oregon_1848|pacific_2026)$"),
+    ] = "oregon_1848",
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+    conn: Annotated[sqlite3.Connection, Depends(get_db)] = None,  # type: ignore[assignment]
+) -> LeaderboardResponse:
+    """Returns top scores and historical roadside memorials for the cartridge."""
+    high_scores_raw = get_leaderboard_entries(conn=conn, cartridge_id=cartridge_id, limit=limit)
+    memorials_raw = get_memorial_entries(conn=conn, cartridge_id=cartridge_id, limit=20)
+
+    return LeaderboardResponse(
+        cartridge_id=cartridge_id,
+        high_scores=[LeaderboardEntry(**entry) for entry in high_scores_raw],
+        memorials=[LeaderboardEntry(**entry) for entry in memorials_raw],
     )
 
 

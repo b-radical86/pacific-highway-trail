@@ -13,6 +13,7 @@ import { CanvasEngine } from '../canvas/canvas_engine.js';
 import { RiverScene } from '../scenes/river_scene.js';
 import { HuntScene } from '../scenes/hunt_scene.js';
 import { sound } from './audio_synth.js';
+import { StorageManager } from '../engine/storage.js';
 import { OREGON_1848_CARTRIDGE } from '../cartridges/oregon_1848.js';
 import { PACIFIC_2026_CARTRIDGE } from '../cartridges/pacific_2026.js';
 
@@ -23,6 +24,11 @@ export function createTrailApp() {
     cartridgeId: 'pacific_2026',
     cartridgeData: PACIFIC_2026_CARTRIDGE,
     selectedOccupationIdx: 0,
+
+    // Persistence & Leaderboard State
+    playerName: 'Brad & Family',
+    epitaphText: '',
+    leaderboard: [],
 
     // UI Controls & Toggles
     crtEnabled: false,
@@ -64,11 +70,68 @@ export function createTrailApp() {
     _eventManager: null,
     _canvasEngine: null,
 
-    init() {
+    async init() {
       this.soundMuted = sound.muted;
       this.initEngine(this.cartridgeId);
       this.initCanvas();
+      await this.loadMemorials(this.cartridgeId);
       sound.unlock();
+    },
+
+    async loadMemorials(cartridgeId) {
+      try {
+        const data = await StorageManager.fetchLeaderboard(cartridgeId);
+        if (data && Array.isArray(data.high_scores)) {
+          this.leaderboard = data.high_scores;
+        }
+        if (data && Array.isArray(data.memorials) && this._canvasEngine) {
+          this._canvasEngine.memorials = data.memorials.map((m) => ({
+            name: m.player_name,
+            distance: m.distance,
+            epitaph: m.epitaph,
+            status: m.status,
+          }));
+        }
+      } catch (e) {
+        console.warn('Failed to load memorials:', e);
+      }
+    },
+
+    autoSave() {
+      if (!this._engine || this.ui.status !== 'IN_PROGRESS') return;
+      StorageManager.saveGame({
+        cartridgeId: this.cartridgeId,
+        distance: this._engine.distance,
+        turn: this._engine.turn,
+        cashCents: this._engine.cashCents,
+        party: this._engine.party,
+        supplies: this._engine.supplies,
+        resolvedWaypoints: Array.from(this._engine.resolvedWaypoints || []),
+        flags: this._eventManager?.flags || {},
+      });
+    },
+
+    async submitAndRestart() {
+      const finalStatus = this.ui.status === 'IN_PROGRESS' ? 'U_TURN' : this.ui.status;
+      await StorageManager.submitRun({
+        cartridge_id: this.cartridgeId,
+        player_name:
+          this.playerName || (this.cartridgeId === 'pacific_2026' ? 'Brad & Family' : 'Pioneers'),
+        score: this.ui.score,
+        turns: this.ui.turn,
+        distance: this.ui.distance,
+        status: finalStatus,
+        epitaph:
+          this.epitaphText ||
+          (finalStatus === 'WON'
+            ? 'Made it to destination!'
+            : 'Ran out of steam on the road.'),
+      });
+
+      StorageManager.clearSave();
+      await this.loadMemorials(this.cartridgeId);
+      this.modalType = null;
+      this.switchCartridge(this.cartridgeId);
     },
 
     initEngine(cartridgeId, occupationIdx = 0) {
@@ -150,6 +213,7 @@ export function createTrailApp() {
         this._canvasEngine.cartridgeId = newId;
         this._canvasEngine.activeScene = null;
       }
+      this.loadMemorials(newId);
       this.modalType = null;
       this.miniGameActive = false;
       this.syncSnapshot();
@@ -172,6 +236,7 @@ export function createTrailApp() {
         this._engine.commitStep(prep);
         this.isTraveling = false;
         this.syncSnapshot();
+        this.autoSave();
 
         // 4. Handle interrupt presentation
         if (prep.interruptType === 'WAYPOINT') {
@@ -201,19 +266,23 @@ export function createTrailApp() {
       if (this.isTraveling || this.modalType || this.ui.status !== 'IN_PROGRESS') return;
       sound.playBeep(520, 'sine', 0.25);
       this._engine.turn += 1;
-      this._engine.party.forEach(m => {
+      this._engine.party.forEach((m) => {
         if (m.health > 0) {
           m.health = Math.min(100, m.health + 12);
           m.morale = Math.min(100, (m.morale ?? 100) + 15);
         }
       });
-      this._engine.supplies.food = Math.max(0, this._engine.supplies.food - (this.cartridgeId === 'pacific_2026' ? 3 : 10));
+      this._engine.supplies.food = Math.max(
+        0,
+        this._engine.supplies.food - (this.cartridgeId === 'pacific_2026' ? 3 : 10)
+      );
       this._engine.logs.push(
         this.cartridgeId === 'pacific_2026'
           ? 'Camped at roadside rest stop for coffee & recovery.'
           : 'Halted wagons for full day of rest and recuperation.'
       );
       this.syncSnapshot();
+      this.autoSave();
     },
 
     cyclePace() {
@@ -243,6 +312,7 @@ export function createTrailApp() {
       this.modalType = null;
       this.activeEvent = null;
       this.syncSnapshot();
+      this.autoSave();
     },
 
     resolveObstacle(action) {
@@ -302,6 +372,7 @@ export function createTrailApp() {
             `Mini-game concluded: Harvested +${result.foodYield} ${this.cartridgeId === 'pacific_2026' ? 'Snacks' : 'lbs food'} (Spent ${result.ammoSpent} ammo).`
           );
           this.syncSnapshot();
+          this.autoSave();
         },
       });
 
@@ -368,7 +439,7 @@ export function createTrailApp() {
 
       if (this.modalType === 'VICTORY' || this.modalType === 'GAMEOVER') {
         if (e.key === 'Escape' || e.key === 'Enter') {
-          this.switchCartridge(this.cartridgeId);
+          this.submitAndRestart();
         }
         return;
       }

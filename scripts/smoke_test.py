@@ -233,6 +233,21 @@ if (!huntResult || huntResult.foodYield !== 100) {
   throw new Error('Carry cap failed to limit food to 100');
 }
 
+// 9. StorageManager serialization & offline fallback
+import { StorageManager } from './app/static/js/engine/storage.js';
+const mockStore = {};
+globalThis.localStorage = {
+  getItem: (k) => mockStore[k] || null,
+  setItem: (k, v) => { mockStore[k] = String(v); },
+  removeItem: (k) => { delete mockStore[k]; }
+};
+const saved = StorageManager.saveGame({ cartridgeId: 'pacific_2026', distance: 150 });
+if (!saved) throw new Error('Save game failed');
+const loaded = StorageManager.loadGame();
+if (!loaded || loaded.distance !== 150) throw new Error('Load game failed');
+StorageManager.clearSave();
+if (StorageManager.loadGame() !== null) throw new Error('Clear save failed');
+
 console.log('NODE_ESM_ASSERTIONS_PASSED');
 """
     result = subprocess.run(
@@ -375,7 +390,96 @@ def run_golden_path_smoke_test() -> None:
             assert alias_resp.status_code == 200
             assert alias_resp.json()["status"] == "ok"
 
-    # 7. Cross-Language Node ESM Verification
+            # 7. Verify SQLite Leaderboard & Roadside Memorial API
+            sub_1848 = {
+                "cartridge_id": "oregon_1848",
+                "player_name": "Pioneer Pete",
+                "score": 8500,
+                "turns": 45,
+                "distance": 2000.0,
+                "status": "WON",
+                "epitaph": "Made it to Oregon!",
+            }
+            r1 = client.post("/api/leaderboard", json=sub_1848)
+            assert r1.status_code == 200, f"Submit 1848 failed: {r1.text}"
+            assert r1.json()["status"] == "recorded"
+            assert r1.json()["id"] > 0
+
+            sub_2026 = {
+                "cartridge_id": "pacific_2026",
+                "player_name": "Brad & Tegan",
+                "score": 12400,
+                "turns": 8,
+                "distance": 920.0,
+                "status": "WON",
+                "epitaph": "Surviving the M1",
+            }
+            r2 = client.post("/api/leaderboard", json=sub_2026)
+            assert r2.status_code == 200, f"Submit 2026 failed: {r2.text}"
+
+            sub_died = {
+                "cartridge_id": "oregon_1848",
+                "player_name": "Gary",
+                "score": 1200,
+                "turns": 12,
+                "distance": 450.0,
+                "status": "DIED",
+                "epitaph": "Here lies Gary. Died of dysentery.",
+            }
+            r3 = client.post("/api/leaderboard", json=sub_died)
+            assert r3.status_code == 200, f"Submit died record failed: {r3.text}"
+
+            # Verify Anti-Tampering & Kinematic Bounds
+            tamper_speed = {
+                "cartridge_id": "oregon_1848",
+                "player_name": "Speed Cheater",
+                "score": 15000,
+                "turns": 1,
+                "distance": 1000.0,
+                "status": "DIED",
+            }
+            r_speed = client.post("/api/leaderboard", json=tamper_speed)
+            assert r_speed.status_code == 400, "Should reject impossible velocity"
+
+            tamper_win = {
+                "cartridge_id": "oregon_1848",
+                "player_name": "Short Cheater",
+                "score": 9000,
+                "turns": 30,
+                "distance": 200.0,
+                "status": "WON",
+            }
+            r_win = client.post("/api/leaderboard", json=tamper_win)
+            assert r_win.status_code == 400, "Should reject win without reaching destination"
+
+            tamper_score = {
+                "cartridge_id": "pacific_2026",
+                "player_name": "Score Cheater",
+                "score": 99999,
+                "turns": 10,
+                "distance": 920.0,
+                "status": "WON",
+            }
+            r_score = client.post("/api/leaderboard", json=tamper_score)
+            assert r_score.status_code in (400, 422), "Should reject out-of-bound score"
+
+            # Verify GET /api/leaderboard and Cartridge Isolation
+            lb_1848 = client.get("/api/leaderboard?cartridge_id=oregon_1848").json()
+            assert lb_1848["cartridge_id"] == "oregon_1848"
+            assert len(lb_1848["high_scores"]) >= 2
+            assert lb_1848["high_scores"][0]["player_name"] == "Pioneer Pete"
+            assert lb_1848["high_scores"][0]["score"] == 8500
+            assert any(
+                m["player_name"] == "Gary" and m["distance"] == 450.0 for m in lb_1848["memorials"]
+            ), "Gary's tombstone should be in memorials"
+
+            lb_2026 = client.get("/api/leaderboard?cartridge_id=pacific_2026").json()
+            assert lb_2026["cartridge_id"] == "pacific_2026"
+            assert len(lb_2026["high_scores"]) >= 1
+            assert lb_2026["high_scores"][0]["player_name"] == "Brad & Tegan"
+            assert not any(h["player_name"] == "Pioneer Pete" for h in lb_2026["high_scores"])
+
+    # 8. Cross-Language Node ESM Verification
     verify_node_esm_engine(PROJECT_ROOT)
 
     print(

@@ -343,7 +343,7 @@
     <!-- VICTORY / GAMEOVER SCREEN -->
     <div x-show="modalType === 'VICTORY' || modalType === 'GAMEOVER'" x-transition.opacity
          class="absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
-      <div class="bg-neutral-900 border-2 rounded-xl max-w-md w-full p-6 text-center space-y-4"
+      <div class="bg-neutral-900 border-2 rounded-xl max-w-lg w-full p-6 text-center space-y-4 shadow-2xl"
            :class="modalType === 'VICTORY' ? 'border-amber-400' : 'border-red-500'">
         <h2 class="font-pixel text-base"
             :class="modalType === 'VICTORY' ? 'text-amber-400' : 'text-red-500'"
@@ -352,15 +352,31 @@
         <p class="text-xs text-neutral-300 font-mono"
            x-text="modalType === 'VICTORY' ? 'You arrived at the final destination.' : (cartridgeId === 'pacific_2026' ? 'Adults reached 0 Sanity. Emergency U-Turn initiated!' : 'All party members perished on the trail.')"></p>
 
-        <div class="p-3 bg-black/60 rounded border border-neutral-800 text-xs font-mono space-y-1">
-          <div>Distance: <strong x-text="ui.distance + ' ' + ui.distanceUnit"></strong></div>
-          <div>Turns Taken: <strong x-text="ui.turn"></strong></div>
-          <div>Final Score: <strong class="text-amber-400 text-sm" x-text="ui.score"></strong></div>
+        <div class="p-3 bg-black/60 rounded border border-neutral-800 text-xs font-mono grid grid-cols-3 gap-2">
+          <div>Distance: <strong class="block text-neutral-200" x-text="ui.distance + ' ' + ui.distanceUnit"></strong></div>
+          <div>Turns Taken: <strong class="block text-neutral-200" x-text="ui.turn"></strong></div>
+          <div>Final Score: <strong class="block text-amber-400 text-sm" x-text="ui.score"></strong></div>
         </div>
 
-        <button @click="switchCartridge(cartridgeId)"
-                class="w-full py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded font-mono text-xs">
-          Play Again [Enter]
+        <!-- Name & Roadside Memorial Input -->
+        <div class="space-y-2 text-left bg-black/40 p-3 rounded border border-neutral-800/80">
+          <div>
+            <label class="block text-[10px] font-mono text-neutral-400 mb-1">PIONEER / DRIVER NAME</label>
+            <input type="text" x-model="playerName" maxlength="40"
+                   class="w-full bg-neutral-950 border border-neutral-700 rounded px-2.5 py-1.5 text-xs text-neutral-200 font-mono focus:border-amber-400 focus:outline-none"
+                   placeholder="Enter your name">
+          </div>
+          <div>
+            <label class="block text-[10px] font-mono text-neutral-400 mb-1">ROADSIDE MEMORIAL EPITAPH</label>
+            <input type="text" x-model="epitaphText" maxlength="120"
+                   class="w-full bg-neutral-950 border border-neutral-700 rounded px-2.5 py-1.5 text-xs text-neutral-200 font-mono focus:border-amber-400 focus:outline-none"
+                   :placeholder="cartridgeId === 'pacific_2026' ? 'e.g., Roof pod blew off outside Kempsey' : 'e.g., Here lies Gary. Died of dysentery.'">
+          </div>
+        </div>
+
+        <button @click="submitAndRestart()"
+                class="w-full py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded font-mono text-xs shadow transition active:scale-[0.99]">
+          Submit Record & Play Again [Enter]
         </button>
       </div>
     </div>

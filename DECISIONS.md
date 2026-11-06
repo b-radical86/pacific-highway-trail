@@ -27,3 +27,7 @@ Rationale: Delivers cartridge-adaptive river/gridlock obstacle physics, The Dall
 Date: 2026-11-06
 Decision: Implement Phase 5 desktop command UI (`app/static/index.html`), phased travel animation sequencer (`app.js`), and procedural Web Audio synthesizer (`audio_synth.js`).
 Rationale: Integrates Alpine.js reactive presentation with headless simulation state, provides keyboard hotkey loop ([Space], [R], [P], [1-4]), and unlocks zero-dependency procedural audio.
+
+Date: 2026-11-06
+Decision: Implement Phase 6 SQLite leaderboard/memorial persistence (`POST`/`GET /api/leaderboard`), client storage manager (`storage.js`), server-side kinematic bounds validation, and turn-boundary auto-save.
+Rationale: Persists high scores and player roadside tombstones across game runs with anti-tampering velocity/score ceilings and offline queuing without external dependencies.
