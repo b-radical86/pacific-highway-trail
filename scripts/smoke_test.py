@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 
@@ -43,8 +44,92 @@ from app.core.guardrails import (  # noqa: E402
 from app.main import app  # noqa: E402
 
 
+def verify_node_esm_engine(project_root: Path) -> None:
+    """Invokes Node directly to run ESM assertions against production JS engine files."""
+    node_test_script = """
+import { PRNG } from './app/static/js/engine/prng.js';
+import { CoreTrailEngine } from './app/static/js/engine/trail_engine.js';
+
+// 1. PRNG determinism & state restore
+const prng1 = new PRNG(12345);
+const valA = prng1.next();
+const state = prng1.getState();
+const valB = prng1.next();
+
+const prng2 = new PRNG(999);
+prng2.setState(state);
+const valC = prng2.next();
+if (valB !== valC) throw new Error('PRNG state restore mismatch');
+
+// 2. Kinematic & Waypoint Clamping
+const engine = new CoreTrailEngine({
+  cartridgeId: 'pacific_2026',
+  dBase: 50,
+  waypoints: [
+    {
+      id: 'wp_bridge',
+      name: 'Bridge',
+      distance: 30,
+      obstacle: { phi: 0.4, psi: 0.5, costCents: 450 }
+    }
+  ],
+  party: [
+    { name: 'Brad', role: 'primary', health: 100, morale: 100 },
+    { name: 'Tegan', role: 'primary', health: 100, morale: 100 }
+  ]
+});
+
+const prep1 = engine.prepareStep();
+if (prep1.targetDistance !== 30 || prep1.interruptType !== 'WAYPOINT') {
+  throw new Error('Waypoint clamping failed: ' + JSON.stringify(prep1));
+}
+engine.commitStep(prep1);
+if (engine.distance !== 30 || !engine.resolvedWaypoints.has('wp_bridge')) {
+  throw new Error('Step commit failed');
+}
+
+// 3. Obstacle Resolution
+if (!engine.activeObstacle) throw new Error('Active obstacle missing');
+const payOutcome = engine.resolveObstacle('pay');
+if (!payOutcome.success || payOutcome.costCents !== 675) {
+  throw new Error('Obstacle pay resolution failed: ' + JSON.stringify(payOutcome));
+}
+
+// 4. Scoring bounds & 0 vitality edge cases
+const emptyEngine = new CoreTrailEngine({
+  cartridgeId: 'pacific_2026',
+  party: [
+    { name: 'Brad', role: 'primary', health: 0, morale: 0 }
+  ]
+});
+const hazard = emptyEngine.evaluateHazardRoll();
+if (isNaN(hazard.p) || hazard.p > 0.45) {
+  throw new Error('Hazard roll NaN or exceed cap: ' + hazard.p);
+}
+const score = engine.calculateScore();
+if (typeof score !== 'number' || score <= 0) {
+  throw new Error('Score calculation failed: ' + score);
+}
+
+console.log('NODE_ESM_ASSERTIONS_PASSED');
+"""
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", node_test_script],
+        cwd=str(project_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Node ESM engine verification failed (exit {result.returncode}):\n"
+            f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+        )
+    assert "NODE_ESM_ASSERTIONS_PASSED" in result.stdout, "Missing success sentinel from Node test"
+
+
 def run_golden_path_smoke_test() -> None:
-    """Executes verification of storage, backups, scrubber, circuit breaker, and health check."""
+    """Executes end-to-end storage, backups, scrubber, circuit breaker, API, and ESM tests."""
     with tempfile.TemporaryDirectory(prefix="smoke_test_") as tmp_dir:
         tmp_path = Path(tmp_dir)
         db_file = tmp_path / "test_projects.db"
@@ -168,7 +253,13 @@ def run_golden_path_smoke_test() -> None:
             assert alias_resp.status_code == 200
             assert alias_resp.json()["status"] == "ok"
 
-    print("SMOKE TEST PASSED: WAL SQLite, Backup, Scrubber, Circuit Breaker, & Health API OK.")
+    # 7. Cross-Language Node ESM Verification
+    verify_node_esm_engine(PROJECT_ROOT)
+
+    print(
+        "SMOKE TEST PASSED: WAL SQLite, Backup, Scrubber, Circuit Breaker, Health API, "
+        "& Node ESM Engine OK."
+    )
 
 
 if __name__ == "__main__":

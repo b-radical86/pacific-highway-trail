@@ -7,3 +7,7 @@ Rationale: Enforces fail-fast startup hygiene, transaction safety, and structure
 Date: 2026-11-06
 Decision: Pivot UI architecture to Desktop-First Package specification (16:9/16:10 aspect shell, keyboard hotkeys, crisp virtual canvas scaling, and W3C pointer abstraction).
 Rationale: User requirement to target desktop package initially with future mobile deploy readiness without rewriting core input or rendering.
+
+Date: 2026-11-06
+Decision: Implement Phase 1 deterministic simulation engine (`prng.js`, `trail_engine.js`) with two-phase step preparation (`prepareStep`), waypoint clamping, dynamic hazard entropy, and Node ESM smoke test runner.
+Rationale: Decouples headless simulation logic from presentation layer and eliminates duplicate Python math ports by testing production ES modules directly via Node in `scripts/smoke_test.py`.
