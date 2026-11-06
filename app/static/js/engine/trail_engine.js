@@ -42,8 +42,11 @@ export class CoreTrailEngine {
     // Rations: filling (3), meager (1.5), bare_bones (0.5) per member
     this.rationTier = config.rationTier || 'filling';
 
-    // Route Waypoints
+    // Route Waypoints & Economy Config
     this.waypoints = Array.isArray(config.waypoints) ? config.waypoints : [];
+    this.outfitterCatalog = Array.isArray(config.outfitter) ? config.outfitter : [];
+    this.barterConfig = config.barterConfig || null;
+    this._storeCache = { distance: -1, items: [] };
 
     // Party Members [{ name, role: 'primary'|'secondary'|'pet', health, morale, statusEffects: [] }]
     this.party = Array.isArray(config.party) ? JSON.parse(JSON.stringify(config.party)) : [];
@@ -91,6 +94,19 @@ export class CoreTrailEngine {
   getNextWaypoint() {
     for (const wp of this.waypoints) {
       if (!this.resolvedWaypoints.has(wp.id) && wp.distance > this.distance) {
+        return wp;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Finds the waypoint matching the party's current exact distance, if any.
+   * @returns {Object|null}
+   */
+  getCurrentWaypoint() {
+    for (const wp of this.waypoints) {
+      if (wp.distance === this.distance) {
         return wp;
       }
     }
@@ -484,6 +500,118 @@ export class CoreTrailEngine {
     this.logs.push(`Purchased provisions: Spent $${(totalCostCents / 100).toFixed(2)}.`);
     return {
       success: true,
+      spentCents: totalCostCents,
+      remainingCashCents: this.cashCents,
+    };
+  }
+
+  /**
+   * Returns the mid-trail store catalog at the current distance with
+   * geographic inflation and deterministic stock scarcity rolls.
+   *
+   * Formula:
+   * UnitPrice(d) = round(BasePrice_cents * (1.0 + gamma * (d / D_total)^1.15))
+   * P(SoldOut) = clamp(baseScarcity * (d / D_total), 0.0, 0.65)
+   *
+   * @param {Array<Object>} [baseCatalog] Optional override catalog
+   * @returns {Array<Object>} Inflated catalog items with soldOut flags
+   */
+  getMidTrailStoreCatalog(baseCatalog = null) {
+    const sourceCatalog =
+      Array.isArray(baseCatalog) && baseCatalog.length > 0
+        ? baseCatalog
+        : this.outfitterCatalog;
+
+    if (
+      !baseCatalog &&
+      this._storeCache &&
+      this._storeCache.distance === this.distance &&
+      this._storeCache.items.length > 0
+    ) {
+      return this._storeCache.items;
+    }
+
+    const gamma = this.cartridgeId === 'oregon_1848' ? 2.5 : 1.6;
+    const dRatio = Math.max(0, Math.min(1.0, this.distance / Math.max(1, this.totalDistance)));
+    const inflationFactor = 1.0 + gamma * Math.pow(dRatio, 1.15);
+    const markupPct = Math.round((inflationFactor - 1.0) * 100);
+
+    const items = sourceCatalog.map((item) => {
+      const inflatedCostCents = Math.round(item.unitCostCents * inflationFactor);
+      const isEssential = item.id === 'food' || item.id === 'ammo';
+      const baseScarcity = isEssential ? 0.0 : (item.baseScarcity ?? 0.45);
+      const pSoldOut = Math.max(0.0, Math.min(0.65, baseScarcity * dRatio));
+      const soldOut = pSoldOut > 0 ? this.prng.next() < pSoldOut : false;
+
+      return {
+        ...item,
+        baseCostCents: item.unitCostCents,
+        unitCostCents: inflatedCostCents,
+        markupPct,
+        soldOut,
+      };
+    });
+
+    if (!baseCatalog) {
+      this._storeCache = { distance: this.distance, items };
+    }
+    return items;
+  }
+
+  /**
+   * Purchases an item from a mid-trail Fort / Highway Servo store.
+   * Enforces stock availability (soldOut) and integer-cent wallet balance.
+   *
+   * @param {string} itemId Supply slot ID ('food', 'ammo', 'traction', 'partA', 'partB', 'partC')
+   * @param {number} [qty=1] Number of packs/units to purchase
+   * @param {Array<Object>} [baseCatalog] Optional catalog override
+   * @returns {{ success: boolean, reason?: string, spentCents?: number, remainingCashCents?: number, unitsAdded?: number }}
+   */
+  buyMidTrailItem(itemId, qty = 1, baseCatalog = null) {
+    if (!itemId || qty <= 0) {
+      return { success: false, reason: 'INVALID_QTY' };
+    }
+
+    const catalog = this.getMidTrailStoreCatalog(baseCatalog);
+    const item = catalog.find((i) => i.id === itemId);
+    if (!item) {
+      return { success: false, reason: 'ITEM_NOT_FOUND' };
+    }
+    if (item.soldOut) {
+      return { success: false, reason: 'SOLD_OUT' };
+    }
+
+    const totalCostCents = qty * item.unitCostCents;
+    if (totalCostCents > this.cashCents) {
+      return {
+        success: false,
+        reason: 'INSUFFICIENT_FUNDS',
+        required: totalCostCents,
+        available: this.cashCents,
+      };
+    }
+
+    this.cashCents -= totalCostCents;
+    const unitsAdded = qty * (item.bundleSize || 1);
+
+    if (itemId === 'traction') {
+      this.traction = Math.min(this.maxTraction, this.traction + unitsAdded);
+    } else {
+      this.supplies[itemId] = (this.supplies[itemId] || 0) + unitsAdded;
+    }
+
+    const wp = this.getCurrentWaypoint();
+    const storeTitle =
+      wp?.storeName || (this.cartridgeId === 'pacific_2026' ? 'Highway Servo' : 'Trading Post');
+    this.logs.push(
+      `${storeTitle}: Bought +${unitsAdded} ${item.unitLabel || item.id} for $${(totalCostCents / 100).toFixed(2)}.`
+    );
+
+    return {
+      success: true,
+      itemId,
+      qty,
+      unitsAdded,
       spentCents: totalCostCents,
       remainingCashCents: this.cashCents,
     };

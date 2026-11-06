@@ -75,7 +75,15 @@ export const OREGON_1848_CARTRIDGE = {
 
   // 12 Waypoints across the 2,000 Mile Trail
   waypoints: [
-    { id: 'wp_indep', name: 'Independence, Missouri', distance: 0, landmark: true },
+    {
+      id: 'wp_indep',
+      name: 'Independence, Missouri',
+      distance: 0,
+      landmark: true,
+      tradingPost: true,
+      hasStore: true,
+      storeName: "Matt's General Store (Independence)",
+    },
     {
       id: 'wp_kansas',
       name: 'Kansas River Crossing',
@@ -88,9 +96,25 @@ export const OREGON_1848_CARTRIDGE = {
       distance: 185,
       obstacle: { type: 'river', phi: 0.50, psi: 0.45, costCents: 600, label: 'Big Blue River (Swift Current)' },
     },
-    { id: 'wp_kearney', name: 'Fort Kearney', distance: 304, landmark: true, tradingPost: true },
+    {
+      id: 'wp_kearney',
+      name: 'Fort Kearney',
+      distance: 304,
+      landmark: true,
+      tradingPost: true,
+      hasStore: true,
+      storeName: "Fort Kearney Sutler's Post",
+    },
     { id: 'wp_chimney', name: 'Chimney Rock', distance: 554, landmark: true },
-    { id: 'wp_laramie', name: 'Fort Laramie', distance: 640, landmark: true, tradingPost: true },
+    {
+      id: 'wp_laramie',
+      name: 'Fort Laramie',
+      distance: 640,
+      landmark: true,
+      tradingPost: true,
+      hasStore: true,
+      storeName: 'Fort Laramie Trading Co.',
+    },
     { id: 'wp_indep_rock', name: 'Independence Rock', distance: 830, landmark: true },
     { id: 'wp_south_pass', name: 'South Pass (Continental Divide)', distance: 932, landmark: true },
     {
@@ -99,7 +123,15 @@ export const OREGON_1848_CARTRIDGE = {
       distance: 1080,
       obstacle: { type: 'river', phi: 0.65, psi: 0.55, costCents: 800, label: 'Green River (Deep Chasm)' },
     },
-    { id: 'wp_fort_hall', name: 'Fort Hall', distance: 1288, landmark: true, tradingPost: true },
+    {
+      id: 'wp_fort_hall',
+      name: 'Fort Hall',
+      distance: 1288,
+      landmark: true,
+      tradingPost: true,
+      hasStore: true,
+      storeName: "Hudson's Bay Co. Post (Fort Hall)",
+    },
     {
       id: 'wp_snake',
       name: 'Snake River Crossing',

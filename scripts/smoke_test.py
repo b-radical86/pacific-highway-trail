@@ -348,6 +348,41 @@ if (shopEngine.supplies.food !== 10 || shopEngine.supplies.ammo !== 10) {
   throw new Error('Inventory bundles mismatch: ' + JSON.stringify(shopEngine.supplies));
 }
 
+// 12. Deliverable 1: Mid-Trail General Stores & Price Gouging
+const midStoreEngine = new CoreTrailEngine({
+  cartridgeId: 'oregon_1848',
+  totalDistance: 2000,
+  cashCents: 5000,
+  outfitter: OREGON_1848_CARTRIDGE.outfitter,
+  waypoints: OREGON_1848_CARTRIDGE.waypoints,
+  supplies: { food: 10, ammo: 0, partA: 0, partB: 0, partC: 0 }
+});
+const catAtStart = midStoreEngine.getMidTrailStoreCatalog();
+const startFoodPrice = catAtStart.find(i => i.id === 'food').unitCostCents;
+midStoreEngine.distance = 1288; // Fort Hall
+const catAtFortHall = midStoreEngine.getMidTrailStoreCatalog();
+const fortHallFoodPrice = catAtFortHall.find(i => i.id === 'food').unitCostCents;
+if (fortHallFoodPrice <= startFoodPrice) {
+  throw new Error('Expected inflated store price at Fort Hall: ' + fortHallFoodPrice);
+}
+const buyMidOk = midStoreEngine.buyMidTrailItem('food', 2);
+if (!buyMidOk.success || midStoreEngine.supplies.food !== 30) {
+  throw new Error('buyMidTrailItem failed: ' + JSON.stringify(buyMidOk));
+}
+if (midStoreEngine.cashCents !== 5000 - (2 * fortHallFoodPrice)) {
+  throw new Error('buyMidTrailItem cash deduction mismatch');
+}
+// Force soldOut on partA and verify rejection
+catAtFortHall.find(i => i.id === 'partA').soldOut = true;
+const buySoldOut = midStoreEngine.buyMidTrailItem('partA', 1);
+if (buySoldOut.success !== false || buySoldOut.reason !== 'SOLD_OUT') {
+  throw new Error('Expected SOLD_OUT failure, got: ' + JSON.stringify(buySoldOut));
+}
+const buyTooExpensive = midStoreEngine.buyMidTrailItem('food', 500);
+if (buyTooExpensive.success !== false || buyTooExpensive.reason !== 'INSUFFICIENT_FUNDS') {
+  throw new Error('Expected INSUFFICIENT_FUNDS failure');
+}
+
 console.log('NODE_ESM_ASSERTIONS_PASSED');
 """
     result = subprocess.run(
