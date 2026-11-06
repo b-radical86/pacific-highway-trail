@@ -11,3 +11,7 @@ Rationale: User requirement to target desktop package initially with future mobi
 Date: 2026-11-06
 Decision: Implement Phase 1 deterministic simulation engine (`prng.js`, `trail_engine.js`) with two-phase step preparation (`prepareStep`), waypoint clamping, dynamic hazard entropy, and Node ESM smoke test runner.
 Rationale: Decouples headless simulation logic from presentation layer and eliminates duplicate Python math ports by testing production ES modules directly via Node in `scripts/smoke_test.py`.
+
+Date: 2026-11-06
+Decision: Implement Phase 2 cartridge registries (`oregon_1848.js`, `pacific_2026.js`) and role-aware declarative event DSL (`event_manager.js`).
+Rationale: Enables completely declarative hazard/opportunity execution across both cartridges with role/named target resolution and state-dependent weighting without bespoke JavaScript.

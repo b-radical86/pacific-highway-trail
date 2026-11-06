@@ -49,6 +49,9 @@ def verify_node_esm_engine(project_root: Path) -> None:
     node_test_script = """
 import { PRNG } from './app/static/js/engine/prng.js';
 import { CoreTrailEngine } from './app/static/js/engine/trail_engine.js';
+import { EventManager } from './app/static/js/engine/event_manager.js';
+import { OREGON_1848_CARTRIDGE } from './app/static/js/cartridges/oregon_1848.js';
+import { PACIFIC_2026_CARTRIDGE } from './app/static/js/cartridges/pacific_2026.js';
 
 // 1. PRNG determinism & state restore
 const prng1 = new PRNG(12345);
@@ -109,6 +112,36 @@ if (isNaN(hazard.p) || hazard.p > 0.45) {
 const score = engine.calculateScore();
 if (typeof score !== 'number' || score <= 0) {
   throw new Error('Score calculation failed: ' + score);
+}
+
+// 5. Cartridge Registries & Declarative Event DSL
+if (OREGON_1848_CARTRIDGE.events.length !== 10) {
+  throw new Error('1848 events mismatch: ' + OREGON_1848_CARTRIDGE.events.length);
+}
+if (PACIFIC_2026_CARTRIDGE.events.length !== 10) {
+  throw new Error('2026 events mismatch: ' + PACIFIC_2026_CARTRIDGE.events.length);
+}
+
+const eventEngine = new CoreTrailEngine({
+  cartridgeId: PACIFIC_2026_CARTRIDGE.id,
+  party: PACIFIC_2026_CARTRIDGE.defaultParty,
+  supplies: { food: 20, ammo: 10, partA: 1, partB: 1, partC: 1 },
+  cashCents: 50000
+});
+const eventMgr = new EventManager(PACIFIC_2026_CARTRIDGE.events, prng1);
+
+const adults = eventMgr.resolveTargets('role:adult', eventEngine);
+if (adults.length !== 2) throw new Error('Expected 2 adults, got ' + adults.length);
+
+const arthur = eventMgr.resolveTargets('member:Arthur', eventEngine);
+if (arthur.length !== 1 || arthur[0].name !== 'Arthur (2)') {
+  throw new Error('Arthur lookup failed');
+}
+
+const codeBrown = PACIFIC_2026_CARTRIDGE.events.find(e => e.id === 'EV_CODE_BROWN');
+const receipt = eventMgr.executeChoice(eventEngine, codeBrown, codeBrown.choices[0]);
+if (!receipt.success || eventEngine.supplies.partA !== 0 || arthur[0].status !== 'Clean') {
+  throw new Error('Choice execution failed: ' + JSON.stringify(receipt));
 }
 
 console.log('NODE_ESM_ASSERTIONS_PASSED');
