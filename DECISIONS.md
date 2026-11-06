@@ -35,3 +35,7 @@ Rationale: Persists high scores and player roadside tombstones across game runs 
 Date: 2026-11-06
 Decision: Implement standalone desktop launcher (`launch.command`), clean shutdown endpoint (`POST /api/shutdown`), and UI exit confirmation modal with auto-save.
 Rationale: Allows one-click desktop launching without terminal interaction and guarantees graceful uvicorn/SQLite WAL termination on application exit.
+
+Date: 2026-11-06
+Decision: Vendor Alpine.js ESM build (`/static/vendor/alpine.esm.js`) and initialize via explicit `Alpine.data()` and `Alpine.start()` within the module bundle.
+Rationale: Resolves browser evaluation race condition where deferred CDN script initialized `x-data` before ES module evaluation, restoring instant reactive data binding and offline reliability.

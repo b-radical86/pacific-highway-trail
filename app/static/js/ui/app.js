@@ -71,9 +71,13 @@ export function createTrailApp() {
     _canvasEngine: null,
 
     async init() {
+      if (typeof window !== 'undefined') {
+        window.trailApp = this;
+      }
       this.soundMuted = sound.muted;
       this.initEngine(this.cartridgeId);
       this.initCanvas();
+      this.syncSnapshot();
       await this.loadMemorials(this.cartridgeId);
       sound.unlock();
     },

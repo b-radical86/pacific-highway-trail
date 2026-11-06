@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pacific Highway Trail — Modular Trail Engine</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Grotesk:wght@400;600;700&display=swap');
     .font-pixel { font-family: 'Press Start 2P', monospace; }
@@ -431,8 +430,12 @@
   </div>
 
   <script type="module">
+    import Alpine from '/static/vendor/alpine.esm.js';
     import { createTrailApp } from '/static/js/ui/app.js';
-    window.trailApp = createTrailApp();
+
+    Alpine.data('trailApp', createTrailApp);
+    window.Alpine = Alpine;
+    Alpine.start();
   </script>
 </body>
 </html>
