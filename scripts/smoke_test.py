@@ -52,6 +52,7 @@ import { CoreTrailEngine } from './app/static/js/engine/trail_engine.js';
 import { EventManager } from './app/static/js/engine/event_manager.js';
 import { OREGON_1848_CARTRIDGE } from './app/static/js/cartridges/oregon_1848.js';
 import { PACIFIC_2026_CARTRIDGE } from './app/static/js/cartridges/pacific_2026.js';
+import { CanvasEngine } from './app/static/js/canvas/canvas_engine.js';
 
 // 1. PRNG determinism & state restore
 const prng1 = new PRNG(12345);
@@ -143,6 +144,60 @@ const receipt = eventMgr.executeChoice(eventEngine, codeBrown, codeBrown.choices
 if (!receipt.success || eventEngine.supplies.partA !== 0 || arthur[0].status !== 'Clean') {
   throw new Error('Choice execution failed: ' + JSON.stringify(receipt));
 }
+
+// 6. CanvasEngine & Procedural Vector Renderers
+const ops = [];
+const mockCtx = {
+  setTransform: () => {},
+  createLinearGradient: () => ({ addColorStop: () => {} }),
+  clearRect: () => {},
+  fillRect: () => { ops.push('fillRect'); },
+  strokeRect: () => {},
+  beginPath: () => {},
+  closePath: () => {},
+  moveTo: () => {},
+  lineTo: () => {},
+  quadraticCurveTo: () => {},
+  bezierCurveTo: () => { ops.push('bezier'); },
+  arc: () => {},
+  ellipse: () => {},
+  roundRect: () => {},
+  fill: () => {},
+  stroke: () => {},
+  fillText: (t) => { ops.push('text:' + t); },
+  save: () => {},
+  restore: () => {},
+  translate: () => {},
+  rotate: () => {},
+};
+const mockCanvas = {
+  width: 800,
+  height: 400,
+  getContext: () => mockCtx,
+  getBoundingClientRect: () => ({ left: 100, top: 50, width: 1600, height: 800 }),
+};
+const ce = new CanvasEngine(mockCanvas, {
+  cartridgeId: 'pacific_2026',
+  vfxFlags: { vfxStinkLines: true, vfxSongLoop: true },
+  memorials: [{ name: 'Gary', distance: 5, epitaph: 'Stuck in Kempsey' }]
+});
+if (ce.step(30.0) !== 0.05) throw new Error('dt clamp failed');
+const pt = ce.toVirtualCoords(900, 450);
+if (Math.abs(pt.x - 400) > 0.01 || Math.abs(pt.y - 200) > 0.01 || !pt.inBounds) {
+  throw new Error('Coord normalization failed: ' + JSON.stringify(pt));
+}
+let tweenDone = false;
+ce.startPhasedTravel('MIDDAY', 100, () => { tweenDone = true; });
+ce.step(0.05);
+ce.step(0.05);
+if (!tweenDone || Math.abs(ce.timeOfDay - 0.48) > 0.01) {
+  throw new Error('Phased travel MIDDAY interrupt failed');
+}
+ce.renderFrame();
+if (!ops.includes('bezier')) throw new Error('Expected bezier stink lines in 2026 render');
+ce.cartridgeId = 'oregon_1848';
+ce.weather = 'RAIN';
+ce.renderFrame();
 
 console.log('NODE_ESM_ASSERTIONS_PASSED');
 """

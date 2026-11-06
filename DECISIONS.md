@@ -15,3 +15,7 @@ Rationale: Decouples headless simulation logic from presentation layer and elimi
 Date: 2026-11-06
 Decision: Implement Phase 2 cartridge registries (`oregon_1848.js`, `pacific_2026.js`) and role-aware declarative event DSL (`event_manager.js`).
 Rationale: Enables completely declarative hazard/opportunity execution across both cartridges with role/named target resolution and state-dependent weighting without bespoke JavaScript.
+
+Date: 2026-11-06
+Decision: Implement Phase 3 procedural 2D vector canvas pipeline (`canvas_engine.js`, `renderers_1848.js`, `renderers_2026.js`) with DPR scaling, cached sky gradients, phased travel animation hooks, and coordinate normalization.
+Rationale: Guarantees 60 FPS zero-allocation vector rendering across both cartridges, accurate letterbox pointer mapping, and complete decoupling from Alpine DOM reactivity.
