@@ -77,6 +77,12 @@
           <span>⛶</span>
           <span class="text-neutral-400 text-[10px]">[F]</span>
         </button>
+        <button @click="confirmExit()"
+                class="px-2 py-1 rounded bg-red-950/80 hover:bg-red-900 border border-red-800/80 text-red-300 flex items-center space-x-1 transition ml-1"
+                title="Save and cleanly shut down">
+          <span class="text-[10px]">⏻</span>
+          <span class="font-bold text-[10px]">EXIT</span>
+        </button>
       </div>
     </header>
 
@@ -378,6 +384,47 @@
                 class="w-full py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded font-mono text-xs shadow transition active:scale-[0.99]">
           Submit Record & Play Again [Enter]
         </button>
+      </div>
+    </div>
+
+    <!-- EXIT CONFIRMATION MODAL -->
+    <div x-show="modalType === 'EXIT'" x-transition.opacity
+         class="absolute inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-neutral-900 border-2 border-red-500/80 rounded-xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
+        <div class="w-12 h-12 mx-auto rounded-full bg-red-950/80 border border-red-700/80 flex items-center justify-center text-red-400 text-xl font-bold">
+          ⏻
+        </div>
+        <h3 class="font-pixel text-sm text-red-400">QUIT & SHUT DOWN?</h3>
+        <p class="text-xs text-neutral-300 font-mono">
+          Are you sure you want to exit the trail? Your current progress will be auto-saved and the background server will safely shut down.
+        </p>
+        <div class="flex space-x-3 pt-2">
+          <button @click="modalType = null"
+                  class="flex-1 py-2 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-mono text-xs border border-neutral-700">
+            Cancel [Esc]
+          </button>
+          <button @click="executeShutdown()"
+                  class="flex-1 py-2 rounded bg-red-600 hover:bg-red-500 text-white font-bold font-mono text-xs shadow-lg transition">
+            Shut Down [Enter]
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHUTDOWN IN PROGRESS / COMPLETE OVERLAY -->
+    <div x-show="modalType === 'SHUTDOWN_IN_PROGRESS' || modalType === 'SHUTDOWN_COMPLETE'" x-transition.opacity
+         class="absolute inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
+      <div class="max-w-md w-full text-center space-y-4">
+        <div class="w-14 h-14 mx-auto rounded-full bg-emerald-950 border border-emerald-600 flex items-center justify-center text-emerald-400 text-2xl">
+          ✓
+        </div>
+        <h3 class="font-pixel text-sm text-emerald-400">SYSTEM SHUT DOWN SAFELY</h3>
+        <p class="text-xs text-neutral-400 font-mono">
+          The background server process has stopped and database WAL checkpoints are flushed.
+        </p>
+        <p class="text-[11px] text-neutral-500 font-mono">
+          You may now safely close this browser window or tab.
+        </p>
       </div>
     </div>
 

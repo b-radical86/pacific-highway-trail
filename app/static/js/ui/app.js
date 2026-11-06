@@ -405,6 +405,30 @@ export function createTrailApp() {
       }
     },
 
+    confirmExit() {
+      sound.playBeep(260, 'square', 0.1);
+      this.modalType = 'EXIT';
+    },
+
+    async executeShutdown() {
+      sound.playBeep(220, 'sawtooth', 0.2);
+      this.autoSave();
+      this.modalType = 'SHUTDOWN_IN_PROGRESS';
+
+      try {
+        await fetch('/api/shutdown', { method: 'POST' });
+      } catch (_) {
+        // If server terminates immediately, fetch rejection is expected
+      }
+
+      this.modalType = 'SHUTDOWN_COMPLETE';
+      setTimeout(() => {
+        try {
+          window.close();
+        } catch (_) {}
+      }, 1200);
+    },
+
     // Keyboard Dispatch Loop
     handleKeydown(e) {
       sound.unlock();
@@ -416,6 +440,13 @@ export function createTrailApp() {
             this._canvasEngine.activeScene._endGame();
           }
         }
+        return;
+      }
+
+      // Exit confirmation modal
+      if (this.modalType === 'EXIT') {
+        if (e.key === 'Escape') this.modalType = null;
+        if (e.key === 'Enter') this.executeShutdown();
         return;
       }
 

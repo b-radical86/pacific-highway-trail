@@ -31,3 +31,7 @@ Rationale: Integrates Alpine.js reactive presentation with headless simulation s
 Date: 2026-11-06
 Decision: Implement Phase 6 SQLite leaderboard/memorial persistence (`POST`/`GET /api/leaderboard`), client storage manager (`storage.js`), server-side kinematic bounds validation, and turn-boundary auto-save.
 Rationale: Persists high scores and player roadside tombstones across game runs with anti-tampering velocity/score ceilings and offline queuing without external dependencies.
+
+Date: 2026-11-06
+Decision: Implement standalone desktop launcher (`launch.command`), clean shutdown endpoint (`POST /api/shutdown`), and UI exit confirmation modal with auto-save.
+Rationale: Allows one-click desktop launching without terminal interaction and guarantees graceful uvicorn/SQLite WAL termination on application exit.

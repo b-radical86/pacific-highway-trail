@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+import os
 from pathlib import Path
+import signal
 import sqlite3
 from typing import Annotated, Any
 import uuid
@@ -70,6 +73,7 @@ async def lifespan(app: FastAPI):
     app.state.logger = logger
     app.state.startup_status = startup_status
     app.state.journal_mode = journal_mode
+    app.state.testing = False
 
     logger.info("Startup complete. SQLite journal_mode=%s", journal_mode)
     yield
@@ -223,6 +227,28 @@ async def get_leaderboard(
         high_scores=[LeaderboardEntry(**entry) for entry in high_scores_raw],
         memorials=[LeaderboardEntry(**entry) for entry in memorials_raw],
     )
+
+
+@app.post("/api/shutdown", tags=["System"])
+async def shutdown_system() -> dict[str, str]:
+    """Cleanly initiates server shutdown and lifecycle termination."""
+    logger = getattr(app.state, "logger", None)
+    if logger:
+        logger.info("Shutdown requested via /api/shutdown.")
+
+    is_testing = getattr(app.state, "testing", False)
+    if not is_testing:
+
+        async def _delayed_shutdown() -> None:
+            await asyncio.sleep(0.3)
+            os.kill(os.getpid(), signal.SIGTERM)
+
+        asyncio.create_task(_delayed_shutdown())
+
+    return {
+        "status": "shutting_down",
+        "message": "Server shutdown initiated cleanly.",
+    }
 
 
 @app.get("/", include_in_schema=False)

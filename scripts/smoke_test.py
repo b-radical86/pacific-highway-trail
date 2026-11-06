@@ -479,7 +479,13 @@ def run_golden_path_smoke_test() -> None:
             assert lb_2026["high_scores"][0]["player_name"] == "Brad & Tegan"
             assert not any(h["player_name"] == "Pioneer Pete" for h in lb_2026["high_scores"])
 
-    # 8. Cross-Language Node ESM Verification
+            # 8. Verify clean server shutdown endpoint
+            app.state.testing = True
+            shutdown_resp = client.post("/api/shutdown")
+            assert shutdown_resp.status_code == 200
+            assert shutdown_resp.json()["status"] == "shutting_down"
+
+    # 9. Cross-Language Node ESM Verification
     verify_node_esm_engine(PROJECT_ROOT)
 
     print(
