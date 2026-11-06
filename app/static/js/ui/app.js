@@ -20,10 +20,19 @@ import { PACIFIC_2026_CARTRIDGE } from '../cartridges/pacific_2026.js';
 export function createTrailApp() {
   return {
     // Current Mode & Active Cartridge
-    screen: 'GAME', // 'SELECT' | 'OUTFITTER' | 'GAME' | 'VICTORY' | 'GAMEOVER'
+    screen: 'SETUP', // 'SETUP' | 'OUTFITTER' | 'GAME'
     cartridgeId: 'pacific_2026',
     cartridgeData: PACIFIC_2026_CARTRIDGE,
     selectedOccupationIdx: 0,
+
+    // Outfitter store shopping cart state
+    outfitterCart: {
+      food: 6,
+      ammo: 4,
+      partA: 1,
+      partB: 1,
+      partC: 1,
+    },
 
     // Persistence & Leaderboard State
     playerName: 'Brad & Family',
@@ -140,8 +149,11 @@ export function createTrailApp() {
 
     initEngine(cartridgeId, occupationIdx = 0) {
       this.cartridgeId = cartridgeId;
-      this.cartridgeData = cartridgeId === 'oregon_1848' ? OREGON_1848_CARTRIDGE : PACIFIC_2026_CARTRIDGE;
-      const occ = this.cartridgeData.occupations[occupationIdx] || this.cartridgeData.occupations[0];
+      this.cartridgeData =
+        cartridgeId === 'oregon_1848' ? OREGON_1848_CARTRIDGE : PACIFIC_2026_CARTRIDGE;
+      this.selectedOccupationIdx = occupationIdx;
+      const occ =
+        this.cartridgeData.occupations[occupationIdx] || this.cartridgeData.occupations[0];
 
       this._engine = new CoreTrailEngine({
         cartridgeId,
@@ -152,14 +164,56 @@ export function createTrailApp() {
         lambdaBase: this.cartridgeData.lambdaBase,
         scoreMultiplier: occ.scoreMultiplier,
         cashCents: occ.cashCents,
+        perks: occ.perks,
         waypoints: this.cartridgeData.waypoints,
         party: this.cartridgeData.defaultParty,
+        supplies: { food: 5, ammo: 5, partA: 0, partB: 0, partC: 0 },
         tPar: this.cartridgeData.tPar,
         kt: this.cartridgeData.kt,
       });
 
       this._eventManager = new EventManager(this.cartridgeData.events, this._engine.prng);
       this.syncSnapshot();
+    },
+
+    selectDifficulty(idx) {
+      sound.playBeep(440, 'triangle', 0.1);
+      this.selectedOccupationIdx = idx;
+      this.initEngine(this.cartridgeId, idx);
+      this.outfitterCart = { food: 6, ammo: 4, partA: 1, partB: 1, partC: 1 };
+      this.screen = 'OUTFITTER';
+    },
+
+    adjustCart(itemId, delta) {
+      sound.playBeep(520, 'sine', 0.05);
+      const cur = this.outfitterCart[itemId] || 0;
+      this.outfitterCart[itemId] = Math.max(0, cur + delta);
+    },
+
+    getCartTotalCents() {
+      let total = 0;
+      const catalog = this.cartridgeData.outfitter || [];
+      for (const [id, qty] of Object.entries(this.outfitterCart)) {
+        const item = catalog.find((i) => i.id === id);
+        if (item && qty > 0) {
+          total += qty * item.unitCostCents;
+        }
+      }
+      return total;
+    },
+
+    confirmOutfitterAndDepart() {
+      const total = this.getCartTotalCents();
+      if (total > this.ui.cashCents) {
+        sound.playStinkBuzzer();
+        alert('Cart total exceeds available cash! Lower your quantities.');
+        return;
+      }
+      this._engine.buySupplies(this.outfitterCart, this.cartridgeData.outfitter || []);
+      sound.playFanfare();
+      this.syncSnapshot();
+      this.screen = 'GAME';
+      this.autoSave();
     },
 
     initCanvas() {
@@ -212,6 +266,7 @@ export function createTrailApp() {
     switchCartridge(newId) {
       if (this.isTraveling) return;
       sound.playBeep(440, 'triangle', 0.1);
+      this.selectedOccupationIdx = 0;
       this.initEngine(newId, 0);
       if (this._canvasEngine) {
         this._canvasEngine.cartridgeId = newId;
@@ -220,6 +275,7 @@ export function createTrailApp() {
       this.loadMemorials(newId);
       this.modalType = null;
       this.miniGameActive = false;
+      this.screen = 'SETUP';
       this.syncSnapshot();
     },
 
@@ -268,25 +324,23 @@ export function createTrailApp() {
 
     restTurn() {
       if (this.isTraveling || this.modalType || this.ui.status !== 'IN_PROGRESS') return;
-      sound.playBeep(520, 'sine', 0.25);
-      this._engine.turn += 1;
-      this._engine.party.forEach((m) => {
-        if (m.health > 0) {
-          m.health = Math.min(100, m.health + 12);
-          m.morale = Math.min(100, (m.morale ?? 100) + 15);
-        }
-      });
-      this._engine.supplies.food = Math.max(
-        0,
-        this._engine.supplies.food - (this.cartridgeId === 'pacific_2026' ? 3 : 10)
-      );
-      this._engine.logs.push(
-        this.cartridgeId === 'pacific_2026'
-          ? 'Camped at roadside rest stop for coffee & recovery.'
-          : 'Halted wagons for full day of rest and recuperation.'
-      );
+      const nextWp = this._engine.getNextWaypoint();
+      const isCommercial = Boolean(nextWp && nextWp.servoStop);
+      const result = this._engine.executeRest(isCommercial);
+
+      if (!result.success && result.reason === 'STARVATION') {
+        sound.playStinkBuzzer();
+      } else {
+        sound.playBeep(520, 'sine', 0.25);
+      }
+
       this.syncSnapshot();
       this.autoSave();
+
+      if (this.ui.status === 'DIED' || this.ui.status === 'U_TURN') {
+        sound.playStinkBuzzer();
+        this.modalType = 'GAMEOVER';
+      }
     },
 
     cyclePace() {
@@ -471,6 +525,22 @@ export function createTrailApp() {
             this._canvasEngine.activeScene._endGame();
           }
         }
+        return;
+      }
+
+      // Setup / Difficulty Selection Hotkeys
+      if (this.screen === 'SETUP') {
+        if (e.key === '1') this.selectDifficulty(0);
+        if (e.key === '2') this.selectDifficulty(1);
+        if (e.key === '3') this.selectDifficulty(2);
+        if (e.key === 'Enter') this.selectDifficulty(this.selectedOccupationIdx);
+        return;
+      }
+
+      // Outfitter Store Hotkeys
+      if (this.screen === 'OUTFITTER') {
+        if (e.key === 'Escape') this.screen = 'SETUP';
+        if (e.key === 'Enter') this.confirmOutfitterAndDepart();
         return;
       }
 

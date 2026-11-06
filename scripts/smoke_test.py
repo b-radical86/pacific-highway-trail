@@ -259,6 +259,55 @@ if (!loaded || loaded.distance !== 150) throw new Error('Load game failed');
 StorageManager.clearSave();
 if (StorageManager.loadGame() !== null) throw new Error('Clear save failed');
 
+// 10. CoreTrailEngine: executeRest & anti-exploit starvation mechanics
+const restEngine = new CoreTrailEngine({
+  cartridgeId: 'pacific_2026',
+  supplies: { food: 0, ammo: 5, partA: 0, partB: 0, partC: 0 },
+  cashCents: 5000,
+  party: [{ name: 'Brad', role: 'primary', health: 80, morale: 80 }]
+});
+const starveResult = restEngine.executeRest(false);
+if (starveResult.success !== false || starveResult.reason !== 'STARVATION') {
+  throw new Error('Expected STARVATION rest failure, got: ' + JSON.stringify(starveResult));
+}
+const member = restEngine.party[0];
+if (member.health !== 65 || member.morale !== 60 || member.status !== 'Starving') {
+  throw new Error('Starvation health/morale/status penalty not applied correctly');
+}
+
+// Rest with food consumes rations and heals party (diminishing return on rest #2: 60% of 14 = 8)
+restEngine.supplies.food = 10;
+const healResult = restEngine.executeRest(false);
+if (!healResult.success || !healResult.healed || healResult.hpGain !== 8) {
+  throw new Error('Rest with food failed to heal: ' + JSON.stringify(healResult));
+}
+if (restEngine.supplies.food >= 10) throw new Error('Food was not consumed during rest');
+if (restEngine.party[0].health !== 73) {
+  throw new Error('HP gain mismatch: ' + restEngine.party[0].health);
+}
+
+// 11. CoreTrailEngine: buySupplies outfitter store checkout
+const shopEngine = new CoreTrailEngine({
+  cartridgeId: 'pacific_2026',
+  cashCents: 10000,
+  supplies: { food: 0, ammo: 0, partA: 0, partB: 0, partC: 0 }
+});
+const testCatalog = [
+  { id: 'food', label: 'Snacks', unitCostCents: 1500, bundleSize: 5 },
+  { id: 'ammo', label: 'Coins', unitCostCents: 1000, bundleSize: 10 }
+];
+const buyFail = shopEngine.buySupplies({ food: 10 }, testCatalog);
+if (buyFail.success !== false || buyFail.reason !== 'INSUFFICIENT_FUNDS') {
+  throw new Error('buySupplies should fail on insufficient funds');
+}
+const buyOk = shopEngine.buySupplies({ food: 2, ammo: 1 }, testCatalog);
+if (!buyOk.success || buyOk.spentCents !== 4000 || shopEngine.cashCents !== 6000) {
+  throw new Error('buySupplies checkout deduction failed: ' + JSON.stringify(buyOk));
+}
+if (shopEngine.supplies.food !== 10 || shopEngine.supplies.ammo !== 10) {
+  throw new Error('Inventory bundles mismatch: ' + JSON.stringify(shopEngine.supplies));
+}
+
 console.log('NODE_ESM_ASSERTIONS_PASSED');
 """
     result = subprocess.run(

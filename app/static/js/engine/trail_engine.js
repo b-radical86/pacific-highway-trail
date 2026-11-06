@@ -66,6 +66,8 @@ export class CoreTrailEngine {
     this.turn = 1;
     this.resolvedWaypoints = new Set(config.resolvedWaypoints || []);
     this.hazardCooldown = 0;
+    this.consecutiveRests = 0;
+    this.perks = config.perks || {};
     this.status = 'IN_PROGRESS'; // 'IN_PROGRESS' | 'WON' | 'DIED' | 'U_TURN'
     this.dadEgo = 0;
     this.activeObstacle = null;
@@ -234,23 +236,61 @@ export class CoreTrailEngine {
     this.distance = prep.targetDistance;
     this.turn += 1;
 
-    // Decrement hazard cooldown
+    // Decrement hazard cooldown & reset consecutive rest counter
     if (this.hazardCooldown > 0) {
       this.hazardCooldown -= 1;
     }
+    this.consecutiveRests = 0;
+
+    const activeParty = this.party.filter((m) => m.health > 0);
 
     // Consume Food Rations
-    const foodPerPerson = this.rationTier === 'filling' ? 3 : (this.rationTier === 'meager' ? 2 : 1);
-    const activeCount = this.party.filter(m => m.health > 0).length;
-    const foodUsed = foodPerPerson * activeCount;
+    const foodPerPerson =
+      this.rationTier === 'filling' ? 3 : this.rationTier === 'meager' ? 2 : 1;
+    const foodUsed = foodPerPerson * activeParty.length;
     this.supplies.food = Math.max(0, this.supplies.food - foodUsed);
 
-    // If out of food, apply starvation damage to health
+    // Starvation Attrition
     if (this.supplies.food === 0) {
-      for (const m of this.party) {
-        if (m.health > 0) m.health = Math.max(0, m.health - 10);
+      for (const m of activeParty) {
+        m.health = Math.max(0, m.health - 15);
+        m.morale = Math.max(0, (m.morale ?? 100) - 15);
+        m.status = 'Starving';
       }
-      this.logs.push('Rations exhausted! Party suffered starvation health penalty.');
+      this.logs.push('Out of rations! Starvation damage inflicted (-15 HP, -15 Morale).');
+    }
+
+    // Travel Pace Attrition & Friction
+    const isGrueling =
+      this.currentPaceKey === 'grueling' || this.currentPaceKey === 'hamish';
+    const isStrenuous = this.currentPaceKey === 'strenuous';
+
+    if (isGrueling) {
+      // High speed shreds tyres/traction and drains party stamina
+      this.traction = Math.max(20, this.traction - 5);
+      for (const m of activeParty) {
+        m.morale = Math.max(0, (m.morale ?? 100) - 8);
+        m.health = Math.max(0, m.health - 4);
+      }
+      this.logs.push('Grueling pace punished the party! -5 Traction, -8 Morale, -4 Health.');
+    } else if (isStrenuous) {
+      this.traction = Math.max(30, this.traction - 2);
+      for (const m of activeParty) {
+        m.morale = Math.max(0, (m.morale ?? 100) - 3);
+      }
+    }
+
+    // Ration Tier Morale Impacts
+    if (this.rationTier === 'meager') {
+      for (const m of activeParty) {
+        m.morale = Math.max(0, (m.morale ?? 100) - 4);
+      }
+    } else if (this.rationTier === 'bare_bones') {
+      for (const m of activeParty) {
+        m.morale = Math.max(0, (m.morale ?? 100) - 8);
+        m.health = Math.max(0, m.health - 5);
+      }
+      this.logs.push('Bare-bones rations are draining party vitality.');
     }
 
     // Handle Interrupt Types
@@ -299,6 +339,133 @@ export class CoreTrailEngine {
         this.logs.push('Tragedy on the trail: All party members have perished.');
       }
     }
+  }
+
+  /**
+   * Executes a rest stop action with authentic ration and starvation mechanics.
+   * Eliminates the infinite free healing exploit.
+   *
+   * @param {boolean} isCommercialStop Whether resting at a paid motel/servo/post
+   * @returns {{ success: boolean, reason?: string, hpGain?: number, moraleGain?: number }}
+   */
+  executeRest(isCommercialStop = false) {
+    if (this.status !== 'IN_PROGRESS') {
+      return { success: false, reason: 'GAME_OVER' };
+    }
+
+    this.turn += 1;
+    this.consecutiveRests = (this.consecutiveRests || 0) + 1;
+
+    const activeParty = this.party.filter((m) => m.health > 0);
+    const foodPerPerson =
+      this.rationTier === 'filling' ? 3 : this.rationTier === 'meager' ? 2 : 1;
+    const foodNeeded = activeParty.length * foodPerPerson;
+
+    // Hard Starvation: resting without food causes starvation attrition!
+    if (this.supplies.food <= 0) {
+      for (const m of activeParty) {
+        m.health = Math.max(0, m.health - 15);
+        m.morale = Math.max(0, (m.morale ?? 100) - 20);
+        m.status = 'Starving';
+      }
+      this.logs.push(
+        'Halted with no food! Party suffered severe starvation damage (-15 HP, -20 Morale).'
+      );
+      this.evaluateSurvivalStatus();
+      return {
+        success: false,
+        reason: 'STARVATION',
+        healthDelta: -15,
+        moraleDelta: -20,
+      };
+    }
+
+    // Deduct food rations
+    const foodConsumed = Math.min(this.supplies.food, foodNeeded);
+    this.supplies.food -= foodConsumed;
+
+    // Commercial stop costs lodging fee ($25.00)
+    let commercialFeeCents = 0;
+    if (isCommercialStop && this.cashCents >= 2500) {
+      commercialFeeCents = 2500;
+      this.cashCents -= commercialFeeCents;
+    }
+
+    // Diminishing returns on resting in the wild:
+    // Turn 1: 100% healing (+14 HP, +16 Morale)
+    // Turn 2: 60% healing (+8 HP, +10 Morale)
+    // Turn 3+: 25% healing (+3 HP, +4 Morale) + cabin fever
+    const restEfficiency = isCommercialStop
+      ? 1.2
+      : Math.max(0.25, 1.0 - (this.consecutiveRests - 1) * 0.4);
+    const hpGain = Math.round(14 * restEfficiency);
+    const moraleGain = Math.round(16 * restEfficiency);
+
+    for (const m of activeParty) {
+      m.health = Math.min(100, m.health + hpGain);
+      m.morale = Math.min(100, (m.morale ?? 100) + moraleGain);
+      if (m.status === 'Starving' && this.supplies.food > 0) {
+        m.status = m.role === 'pet' ? 'Purring' : 'Healthy';
+      }
+    }
+
+    const restLabel =
+      this.cartridgeId === 'pacific_2026'
+        ? isCommercialStop
+          ? 'Checked into roadside motel & servo for hot showers.'
+          : 'Camped at roadside rest area.'
+        : isCommercialStop
+          ? 'Rented room at pioneer trading post.'
+          : 'Camped wagon by the trail.';
+
+    this.logs.push(
+      `${restLabel} Rations consumed: ${foodConsumed}. Healed +${hpGain} HP, +${moraleGain} Morale.`
+    );
+
+    this.evaluateSurvivalStatus();
+    return { success: true, healed: true, hpGain, moraleGain, foodConsumed };
+  }
+
+  /**
+   * Purchases provisions from an outfitter store catalog using starting or trail funds.
+   *
+   * @param {Object} cart Map of item IDs to requested quantities { food: 5, ammo: 2, ... }
+   * @param {Array<Object>} catalog Cartridge outfitter catalog definitions
+   * @returns {{ success: boolean, reason?: string, spentCents?: number, remainingCashCents?: number }}
+   */
+  buySupplies(cart, catalog) {
+    let totalCostCents = 0;
+    for (const [itemKey, qty] of Object.entries(cart)) {
+      if (qty <= 0) continue;
+      const catItem = catalog.find((i) => i.id === itemKey);
+      if (catItem) {
+        totalCostCents += qty * catItem.unitCostCents;
+      }
+    }
+
+    if (totalCostCents > this.cashCents) {
+      return {
+        success: false,
+        reason: 'INSUFFICIENT_FUNDS',
+        required: totalCostCents,
+        available: this.cashCents,
+      };
+    }
+
+    this.cashCents -= totalCostCents;
+    for (const [itemKey, qty] of Object.entries(cart)) {
+      if (qty <= 0) continue;
+      const catItem = catalog.find((i) => i.id === itemKey);
+      const unitsAdded = qty * (catItem?.bundleSize || 1);
+      this.supplies[itemKey] = (this.supplies[itemKey] || 0) + unitsAdded;
+    }
+
+    this.logs.push(`Purchased provisions: Spent $${(totalCostCents / 100).toFixed(2)}.`);
+    return {
+      success: true,
+      spentCents: totalCostCents,
+      remainingCashCents: this.cashCents,
+    };
   }
 
   /**

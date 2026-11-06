@@ -86,7 +86,126 @@
     </header>
 
     <!-- Main Desktop Layout -->
-    <div class="flex-1 flex flex-col overflow-hidden">
+    <div class="flex-1 flex flex-col overflow-hidden relative">
+
+      <!-- SCREEN 1: DIFFICULTY & VEHICLE/OCCUPATION SETUP -->
+      <div x-show="screen === 'SETUP'" x-transition.opacity
+           class="absolute inset-0 bg-neutral-950/95 backdrop-blur-md z-40 p-6 sm:p-8 flex flex-col justify-between overflow-y-auto">
+        <div class="max-w-4xl mx-auto w-full space-y-6">
+          <div class="text-center space-y-2">
+            <span class="font-pixel text-[10px] tracking-widest text-amber-500 uppercase"
+                  x-text="cartridgeId === 'pacific_2026' ? 'THE M1 GAUNTLET — PRE-DEPARTURE SETUP' : 'THE OREGON TRAIL — EXPEDITION ENLISTMENT'"></span>
+            <h2 class="font-pixel text-base sm:text-xl text-neutral-100"
+                x-text="cartridgeId === 'pacific_2026' ? 'CHOOSE YOUR FAMILY VEHICLE & DIFFICULTY' : 'CHOOSE YOUR PROFESSION & DIFFICULTY'"></h2>
+            <p class="text-xs text-neutral-400 font-mono">
+              Your archetype sets your starting cash, breakdown resilience, mechanical perks, and score multiplier.
+            </p>
+          </div>
+
+          <!-- 3 Archetype Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+            <template x-for="(occ, idx) in cartridgeData.occupations" :key="occ.id">
+              <div @click="selectedOccupationIdx = idx"
+                   :class="selectedOccupationIdx === idx ? 'border-amber-400 bg-neutral-850 ring-2 ring-amber-400/60 shadow-xl' : 'border-neutral-800 bg-neutral-900/80 hover:border-neutral-600'"
+                   class="p-4 rounded-xl border cursor-pointer transition flex flex-col justify-between group">
+                <div>
+                  <div class="flex items-center justify-between">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold"
+                          :class="idx === 0 ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : (idx === 1 ? 'bg-amber-950 text-amber-400 border border-amber-800' : 'bg-red-950 text-red-400 border border-red-800')"
+                          x-text="idx === 0 ? 'EASY (1.0x)' : (idx === 1 ? 'MEDIUM (2.0x)' : 'HARD (3.0x)')"></span>
+                    <span class="font-mono text-xs text-neutral-500 group-hover:text-amber-400" x-text="'[' + (idx + 1) + ']'"></span>
+                  </div>
+                  <h3 class="font-bold text-sm text-neutral-100 mt-3 group-hover:text-amber-400 transition" x-text="occ.label"></h3>
+                  <p class="text-[11px] text-neutral-400 mt-2 leading-relaxed" x-text="occ.description"></p>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-neutral-800/80 flex items-center justify-between text-xs font-mono">
+                  <span class="text-neutral-500">Starting Cash:</span>
+                  <span class="font-bold text-amber-400" x-text="'$' + (occ.cashCents / 100).toFixed(2)"></span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="max-w-4xl mx-auto w-full pt-4">
+          <button @click="selectDifficulty(selectedOccupationIdx)"
+                  class="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-neutral-950 font-bold rounded-lg font-mono text-xs shadow-xl transition active:scale-[0.99] flex items-center justify-center space-x-2">
+            <span>Proceed to Provisions Store</span>
+            <span class="bg-amber-700/40 text-neutral-950 px-2 py-0.5 rounded text-[10px]">[Enter]</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- SCREEN 2: PRE-DEPARTURE OUTFITTER SHOPPING -->
+      <div x-show="screen === 'OUTFITTER'" x-transition.opacity
+           class="absolute inset-0 bg-neutral-950/95 backdrop-blur-md z-40 p-6 sm:p-8 flex flex-col justify-between overflow-y-auto">
+        <div class="max-w-3xl mx-auto w-full space-y-4">
+          <div class="flex items-center justify-between border-b border-neutral-800 pb-3">
+            <div>
+              <span class="font-pixel text-[10px] text-amber-500 uppercase"
+                    x-text="cartridgeId === 'pacific_2026' ? 'WOOLWORTHS & SERVO EXPRESS — PENNANT HILLS' : 'MATT\'S GENERAL STORE — INDEPENDENCE, MO'"></span>
+              <h2 class="font-pixel text-base text-neutral-100 mt-1">STOCK YOUR EXPEDITION</h2>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] font-mono text-neutral-400 block">AVAILABLE BUDGET</span>
+              <span class="font-pixel text-sm text-emerald-400" x-text="'$' + (ui.cashCents / 100).toFixed(2)"></span>
+            </div>
+          </div>
+
+          <p class="text-xs text-neutral-400 font-mono">
+            Before hitting the trail, spend your budget on food rations, ammunition/distraction coins, and emergency repair kits. You can also save cash for road tolls and motels along the way.
+          </p>
+
+          <!-- Catalog Item Rows -->
+          <div class="space-y-2 pt-2">
+            <template x-for="item in (cartridgeData.outfitter || [])" :key="item.id">
+              <div class="bg-neutral-900/90 border border-neutral-800 rounded-lg p-3 flex items-center justify-between text-xs font-mono">
+                <div class="space-y-0.5 pr-4">
+                  <span class="font-bold text-neutral-200" x-text="item.label"></span>
+                  <span class="text-[10px] text-neutral-400 block"
+                        x-text="'$' + (item.unitCostCents / 100).toFixed(2) + ' per ' + item.unitLabel + (item.bundleSize > 1 ? ' (+' + item.bundleSize + ' per pack)' : '')"></span>
+                </div>
+
+                <!-- Quantity Controls & Subtotal -->
+                <div class="flex items-center space-x-3 shrink-0">
+                  <div class="flex items-center space-x-1.5 bg-neutral-950 border border-neutral-700 rounded p-1">
+                    <button @click="adjustCart(item.id, -1)" class="w-6 h-6 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-bold flex items-center justify-center">-</button>
+                    <span class="w-8 text-center font-bold text-amber-400" x-text="outfitterCart[item.id] || 0"></span>
+                    <button @click="adjustCart(item.id, 1)" class="w-6 h-6 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-bold flex items-center justify-center">+</button>
+                  </div>
+                  <span class="w-16 text-right font-bold text-neutral-200"
+                        x-text="'$' + (((outfitterCart[item.id] || 0) * item.unitCostCents) / 100).toFixed(2)"></span>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Budget Summary -->
+          <div class="bg-black/60 border border-neutral-800 rounded-lg p-3 flex items-center justify-between text-xs font-mono mt-4">
+            <div>
+              <span class="text-neutral-400">Total Provisions Cost: </span>
+              <strong class="text-amber-400" x-text="'$' + (getCartTotalCents() / 100).toFixed(2)"></strong>
+            </div>
+            <div>
+              <span class="text-neutral-400">Remaining Cash: </span>
+              <strong :class="ui.cashCents - getCartTotalCents() < 0 ? 'text-red-400' : 'text-emerald-400'"
+                      x-text="'$' + Math.max(0, (ui.cashCents - getCartTotalCents()) / 100).toFixed(2)"></strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="max-w-3xl mx-auto w-full pt-4 flex space-x-3">
+          <button @click="screen = 'SETUP'" class="px-4 py-3 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-mono text-xs border border-neutral-700">
+            Back [Esc]
+          </button>
+          <button @click="confirmOutfitterAndDepart()"
+                  class="flex-1 py-3 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-lg font-mono text-xs shadow-xl transition active:scale-[0.99] flex items-center justify-center space-x-2">
+            <span>Depart on the Trail</span>
+            <span class="bg-amber-700/40 text-neutral-950 px-2 py-0.5 rounded text-[10px]">[Enter]</span>
+          </button>
+        </div>
+      </div>
 
       <!-- Upper Viewport Stage (800x400 Virtual Viewport) -->
       <div class="relative w-full h-[54%] bg-black flex items-center justify-center overflow-hidden border-b border-neutral-800">
@@ -175,9 +294,12 @@
 
             <!-- Supply Grid -->
             <div class="grid grid-cols-2 gap-2 mb-3">
-              <div class="bg-neutral-900/80 p-2 rounded border border-neutral-800">
+              <div class="bg-neutral-900/80 p-2 rounded border border-neutral-800 transition"
+                   :class="ui.supplies.food === 0 ? 'border-red-600/80 bg-red-950/20' : ''">
                 <div class="text-[9px] font-mono text-neutral-400" x-text="cartridgeId === 'pacific_2026' ? 'Car Snacks (pkts)' : 'Rations (lbs)'"></div>
-                <div class="text-base font-bold text-neutral-100" x-text="ui.supplies.food"></div>
+                <div class="text-base font-bold"
+                     :class="ui.supplies.food === 0 ? 'text-red-400 font-pixel text-xs animate-pulse' : 'text-neutral-100'"
+                     x-text="ui.supplies.food === 0 ? '0 (STARVING)' : ui.supplies.food"></div>
               </div>
               <div class="bg-neutral-900/80 p-2 rounded border border-neutral-800">
                 <div class="text-[9px] font-mono text-neutral-400" x-text="cartridgeId === 'pacific_2026' ? 'Chips / 50¢ Coins' : 'Ammunition'"></div>
@@ -236,8 +358,9 @@
 
               <div class="grid grid-cols-2 gap-2">
                 <button @click="restTurn()" :disabled="isTraveling"
-                        class="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 font-medium rounded border border-neutral-700/80 flex items-center justify-between text-xs transition disabled:opacity-50">
-                  <span x-text="cartridgeId === 'pacific_2026' ? '☕ Rest / Servo' : '⛺ Camp & Rest'"></span>
+                        :class="ui.supplies.food === 0 ? 'border-red-600/80 text-red-400 bg-red-950/30' : 'bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border-neutral-700/80'"
+                        class="px-2.5 py-1.5 font-medium rounded border flex items-center justify-between text-xs transition disabled:opacity-50">
+                  <span x-text="ui.supplies.food === 0 ? '⚠️ Rest (Starving)' : (cartridgeId === 'pacific_2026' ? '☕ Rest / Servo' : '⛺ Camp & Rest')"></span>
                   <span class="text-neutral-400 font-mono text-[10px]">[R]</span>
                 </button>
                 <button @click="cyclePace()" :disabled="isTraveling"

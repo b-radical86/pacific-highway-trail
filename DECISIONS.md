@@ -43,3 +43,7 @@ Rationale: Resolves browser evaluation race condition where deferred CDN script 
 Date: 2026-11-06
 Decision: Overhaul Rest-Stop Defence / Hunting mini-game (`hunt_scene.js`) with real-time pointer tracking, animated crosshair reticle, dynamic lock-on state, and rich procedural vector artwork.
 Rationale: Resolves stationary crosshair reticle, replaces basic solid rectangles with high-detail coastal rest stop scenery (picnic table, wheelie bin, surf waves), animated flapping birds, and particle bursts.
+
+Date: 2026-11-06
+Decision: Implement difficulty selection (`screen: 'SETUP'`), pre-departure outfitter store (`screen: 'OUTFITTER'`), and anti-exploit survival mechanics (`executeRest` starvation attrition, diminishing returns, and pace wear).
+Rationale: Resolves trivial game completion by forcing upfront archetype/budget selection, eliminating infinite free healing when food is depleted, and enforcing realistic pace/starvation attrition.
