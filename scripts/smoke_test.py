@@ -425,6 +425,26 @@ if (barterEngine.cashCents !== 4200) {
   throw new Error('Barter must never modify cashCents, got: ' + barterEngine.cashCents);
 }
 
+// 14. Deliverable 3: Goods-for-Passage Bottleneck Guides
+const snakeWp = OREGON_1848_CARTRIDGE.waypoints.find(w => w.id === 'wp_snake');
+if (!snakeWp || !snakeWp.obstacle || !snakeWp.obstacle.guideCost) {
+  throw new Error('Missing guideCost on Snake River waypoint');
+}
+barterEngine.activeObstacle = JSON.parse(JSON.stringify(snakeWp.obstacle));
+barterEngine.supplies.partA = 0;
+const guideFail = barterEngine.resolveObstacle('guide');
+if (guideFail.success !== false || guideFail.error !== 'INSUFFICIENT_SUPPLIES') {
+  throw new Error('Expected INSUFFICIENT_SUPPLIES for guide: ' + JSON.stringify(guideFail));
+}
+barterEngine.supplies.partA = 1;
+const guideOk = barterEngine.resolveObstacle('guide');
+if (guideOk.pSuccess !== 0.96 || barterEngine.supplies.partA !== 0) {
+  throw new Error('Guide resolution failed to deduct partA: ' + JSON.stringify(guideOk));
+}
+if (barterEngine.cashCents !== 4200) {
+  throw new Error('Guide barter must not deduct cashCents');
+}
+
 console.log('NODE_ESM_ASSERTIONS_PASSED');
 """
     result = subprocess.run(

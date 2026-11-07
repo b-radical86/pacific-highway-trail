@@ -798,8 +798,9 @@ export class CoreTrailEngine {
    * - 'adapt': Caulk & float / Backroad detour
    * - 'pay': Ferry / Toll road
    * - 'delay': Camp on bank / Lay low at bakery (drifts Phi by +/-0.1)
+   * - 'guide': Barter goods for Indigenous/Local Guide or UHF Truckie Escort (96% safe pass)
    *
-   * @param {'force'|'adapt'|'pay'|'delay'} action
+   * @param {'force'|'adapt'|'pay'|'delay'|'guide'} action
    * @param {Object} [perks={}] e.g. { carpenterPerk: boolean }
    * @returns {Object} Resolution outcome
    */
@@ -853,6 +854,33 @@ export class CoreTrailEngine {
       outcome.success = true;
       outcome.costCents = totalCost;
       success = true;
+    } else if (action === 'guide') {
+      const guideCost = obs.guideCost;
+      if (!guideCost || !guideCost.slot || !guideCost.qty) {
+        return { action: 'guide', success: false, error: 'NO_GUIDE_AVAILABLE' };
+      }
+      const haveQty = this.supplies[guideCost.slot] || 0;
+      if (haveQty < guideCost.qty) {
+        return {
+          action: 'guide',
+          success: false,
+          error: 'INSUFFICIENT_SUPPLIES',
+          required: guideCost,
+        };
+      }
+      this.supplies[guideCost.slot] = haveQty - guideCost.qty;
+      pSuccess = 0.96;
+      success = this.prng.next() < pSuccess;
+      outcome.pSuccess = pSuccess;
+      outcome.success = success;
+      outcome.guidePaid = guideCost;
+
+      if (!success) {
+        for (const m of this.party) {
+          m.health = Math.max(0, m.health - 8);
+        }
+        outcome.penalty = 'Even with a local guide, a sudden surge bruised the party (-8 HP).';
+      }
     } else if (action === 'delay') {
       // Delay costs a turn & rations, but drifts Phi by +/- 0.1
       this.turn += 1;
