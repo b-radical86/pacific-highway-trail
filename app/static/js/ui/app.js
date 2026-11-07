@@ -46,10 +46,12 @@ export function createTrailApp() {
     modalType: null, // null | 'DILEMMA' | 'OBSTACLE' | 'OUTFITTER' | 'VICTORY' | 'GAMEOVER' | 'EXIT'
     warningModal: null, // null | { title, message, confirmLabel, cancelLabel, action }
 
-    // Active Dilemma / Obstacle Data
+    // Active Dilemma / Obstacle / Economy Data
     activeEvent: null,
     activeObstacle: null,
     miniGameActive: false,
+    midTrailCatalog: [],
+    activeTradeState: null,
 
     // Shallow Snapshot mirrored from CoreTrailEngine for Alpine DOM rendering
     ui: {
@@ -67,6 +69,9 @@ export function createTrailApp() {
       supplies: { food: 40, ammo: 20, partA: 2, partB: 1, partC: 1 },
       nextWaypointName: '',
       nextWaypointDistance: 0,
+      currentWaypointName: '',
+      canUseStore: false,
+      currentStoreName: '',
       status: 'IN_PROGRESS',
       lastLog: '',
       fps: 60,
@@ -167,6 +172,8 @@ export function createTrailApp() {
         cashCents: occ.cashCents,
         perks: occ.perks,
         waypoints: this.cartridgeData.waypoints,
+        outfitter: this.cartridgeData.outfitter,
+        barterConfig: this.cartridgeData.barterConfig,
         party: this.cartridgeData.defaultParty,
         supplies: { food: 5, ammo: 5, partA: 0, partB: 0, partC: 0 },
         tPar: this.cartridgeData.tPar,
@@ -263,6 +270,7 @@ export function createTrailApp() {
     syncSnapshot() {
       if (!this._engine) return;
       const nextWp = this._engine.getNextWaypoint();
+      const curWp = this._engine.getCurrentWaypoint();
 
       this.ui.turn = this._engine.turn;
       this.ui.distance = this._engine.distance;
@@ -278,6 +286,11 @@ export function createTrailApp() {
       this.ui.supplies = { ...this._engine.supplies };
       this.ui.nextWaypointName = nextWp ? nextWp.name : 'Destination';
       this.ui.nextWaypointDistance = nextWp ? nextWp.distance : this._engine.totalDistance;
+      this.ui.currentWaypointName = curWp ? curWp.name : '';
+      this.ui.canUseStore = Boolean(curWp && curWp.hasStore);
+      this.ui.currentStoreName =
+        curWp?.storeName ||
+        (this.cartridgeId === 'pacific_2026' ? 'Highway Servo Store' : 'Fort Trading Post');
       this.ui.status = this._engine.status;
       this.ui.lastLog = this._engine.logs[this._engine.logs.length - 1] || 'Trail ahead is clear.';
       this.ui.score = this._engine.calculateScore();
@@ -370,8 +383,12 @@ export function createTrailApp() {
         return;
       }
 
+      const curWp = this._engine.getCurrentWaypoint();
       const nextWp = this._engine.getNextWaypoint();
-      const isCommercial = Boolean(nextWp && (nextWp.servoStop || nextWp.tradingPost));
+      const isCommercial = Boolean(
+        (curWp && (curWp.servoStop || curWp.tradingPost)) ||
+          (nextWp && (nextWp.servoStop || nextWp.tradingPost))
+      );
       const result = this._engine.executeRest(isCommercial);
 
       if (!result.success && result.reason === 'STARVATION') {
@@ -421,6 +438,7 @@ export function createTrailApp() {
 
     resolveObstacle(action) {
       if (!this._engine.activeObstacle) return;
+      const obsSnapshot = this._engine.activeObstacle;
       const perks = { carpenterPerk: this.cartridgeId === 'oregon_1848' && this.selectedOccupationIdx === 1 };
       const outcome = this._engine.resolveObstacle(action, perks);
 
@@ -430,14 +448,21 @@ export function createTrailApp() {
         return;
       }
 
+      if (!outcome.success && outcome.error === 'INSUFFICIENT_SUPPLIES') {
+        sound.playStinkBuzzer();
+        const req = outcome.required || {};
+        alert(`Insufficient supplies for guide! Requires ${req.qty || 1}x (${req.label || req.slot}).`);
+        return;
+      }
+
       // Launch crossing scene animation on canvas
       this.modalType = null;
       sound.playSplash();
 
       const river = new RiverScene({
         cartridgeId: this.cartridgeId,
-        obstacle: this._engine.activeObstacle,
-        onComplete: (success) => {
+        obstacle: obsSnapshot,
+        onComplete: () => {
           this._canvasEngine.activeScene = null;
           this.syncSnapshot();
         },
@@ -445,6 +470,73 @@ export function createTrailApp() {
 
       this._canvasEngine.activeScene = river;
       river.startCrossingAnimation(outcome.success, outcome.success ? 'Crossing successful!' : 'Crossing failed!');
+    },
+
+    openMidTrailStore() {
+      if (this.isTraveling || this.modalType || !this.ui.canUseStore) return;
+      sound.playBeep(480, 'triangle', 0.1);
+      this.midTrailCatalog = this._engine.getMidTrailStoreCatalog();
+      this.modalType = 'MID_STORE';
+    },
+
+    buyFromMidStore(itemId) {
+      const res = this._engine.buyMidTrailItem(itemId, 1);
+      if (!res.success) {
+        sound.playStinkBuzzer();
+        return;
+      }
+      sound.playBeep(620, 'sine', 0.12);
+      this.midTrailCatalog = this._engine.getMidTrailStoreCatalog();
+      this.syncSnapshot();
+      this.autoSave();
+    },
+
+    getBarterSlots() {
+      const slots = this.cartridgeData?.barterConfig?.slots || {};
+      return Object.entries(slots).map(([key, meta], idx) => ({
+        key,
+        label: meta.label,
+        baseQty: meta.baseQty,
+        hotkey: idx + 1,
+      }));
+    },
+
+    openTradeModal() {
+      if (this.isTraveling || this.modalType || this.ui.status !== 'IN_PROGRESS') return;
+      sound.playBeep(440, 'triangle', 0.1);
+      this.activeTradeState = { step: 'SELECT', result: null };
+      this.modalType = 'BARTER';
+    },
+
+    selectTradeWanted(slotKey) {
+      const res = this._engine.initiateTradeAttempt(slotKey);
+      if (res.foundTrader) {
+        sound.playBeep(540, 'sine', 0.15);
+      } else {
+        sound.playStinkBuzzer();
+      }
+      this.activeTradeState = { step: 'OFFER', result: res };
+      this.syncSnapshot();
+      this.autoSave();
+
+      if (this.ui.status === 'DIED' || this.ui.status === 'U_TURN') {
+        this.modalType = 'GAMEOVER';
+      }
+    },
+
+    confirmTradeDeal() {
+      const offer = this.activeTradeState?.result?.offer;
+      if (!offer) return;
+      const res = this._engine.acceptTradeOffer(offer);
+      if (!res.success) {
+        sound.playStinkBuzzer();
+        return;
+      }
+      sound.playFanfare();
+      this.modalType = null;
+      this.activeTradeState = null;
+      this.syncSnapshot();
+      this.autoSave();
     },
 
     launchMiniGame() {
@@ -679,6 +771,43 @@ export function createTrailApp() {
         if (e.key === '2') this.resolveObstacle('adapt');
         if (e.key === '3') this.resolveObstacle('pay');
         if (e.key === '4') this.resolveObstacle('delay');
+        if (e.key === '5' && this.activeObstacle?.guideCost) this.resolveObstacle('guide');
+        return;
+      }
+
+      if (this.modalType === 'MID_STORE') {
+        if (e.key === 'Escape') {
+          this.modalType = null;
+          return;
+        }
+        const idx = parseInt(e.key, 10) - 1;
+        if (idx >= 0 && idx < this.midTrailCatalog.length) {
+          this.buyFromMidStore(this.midTrailCatalog[idx].id);
+        }
+        return;
+      }
+
+      if (this.modalType === 'BARTER') {
+        if (e.key === 'Escape') {
+          this.modalType = null;
+          this.activeTradeState = null;
+          return;
+        }
+        if (this.activeTradeState?.step === 'SELECT') {
+          const slots = this.getBarterSlots();
+          const idx = parseInt(e.key, 10) - 1;
+          if (idx >= 0 && idx < slots.length) {
+            this.selectTradeWanted(slots[idx].key);
+          }
+        } else if (this.activeTradeState?.step === 'OFFER') {
+          const offer = this.activeTradeState.result?.offer;
+          if ((e.key === 'y' || e.key === 'Y' || e.key === 'Enter') && offer && offer.canAfford) {
+            this.confirmTradeDeal();
+          } else if (e.key === 'n' || e.key === 'N' || e.key === 'Enter') {
+            this.modalType = null;
+            this.activeTradeState = null;
+          }
+        }
         return;
       }
 
@@ -701,6 +830,10 @@ export function createTrailApp() {
         this.restTurn();
       } else if (e.key === 'p' || e.key === 'P') {
         this.cyclePace();
+      } else if (e.key === 't' || e.key === 'T') {
+        this.openTradeModal();
+      } else if (e.key === 's' || e.key === 'S') {
+        if (this.ui.canUseStore) this.openMidTrailStore();
       } else if (e.key === 'm' || e.key === 'M') {
         this.toggleSound();
       } else if (e.key === 'f' || e.key === 'F') {

@@ -55,3 +55,7 @@ Rationale: Resolves expert panel vulnerabilities (keyboard bleed during setup, f
 Date: 2026-11-07
 Decision: Overhaul Rest-Stop Defence and Hunting controls with dual hybrid input (Mouse + Keyboard WASD/Arrows aiming and Space/Enter firing), ammo economy protection (free snack collection & miss whiff feedback), and an on-screen controls/targets legend side panel.
 Rationale: Resolves broken control feel where keyboard inputs were ignored, ammo was drained on empty clicks, and players lacked clear on-screen guidance on mouse vs keyboard mechanics.
+
+Date: 2026-11-07
+Decision: Implement the four-pillar mid-journey economy and barter system (`getMidTrailStoreCatalog`, `buyMidTrailItem`, `initiateTradeAttempt`, `acceptTradeOffer`, and `resolveObstacle('guide')`) across `trail_engine.js`, both cartridges, and the desktop UI (`[S]` Store, `[T]` Barter, `[5]` Goods Guide).
+Rationale: Completes the canonical Oregon Trail mid-journey economy with distance-scaled fort/servo price inflation, deterministic stock scarcity, 1-day/leg goods-for-goods trail bartering with a 1.75x desperation multiplier, and non-cash goods guides at late-trail bottlenecks.
