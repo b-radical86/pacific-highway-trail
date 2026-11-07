@@ -168,7 +168,7 @@
           <div class="flex items-center justify-between border-b border-neutral-800 pb-3">
             <div>
               <span class="font-pixel text-[10px] text-amber-500 uppercase"
-                    x-text="cartridgeId === 'pacific_2026' ? 'WOOLWORTHS & SERVO EXPRESS — PENNANT HILLS' : 'MATT\'S GENERAL STORE — INDEPENDENCE, MO'"></span>
+                    x-text="cartridgeId === 'pacific_2026' ? 'DAZZA\'S ULTRA TUNE & BOB JANE T-MARTS — THORNLEIGH (M1 GATEWAY)' : 'MATT\'S GENERAL STORE — INDEPENDENCE, MO'"></span>
               <h2 class="font-pixel text-base text-neutral-100 mt-1">STOCK YOUR EXPEDITION</h2>
             </div>
             <div class="text-right">
@@ -177,18 +177,30 @@
             </div>
           </div>
 
-          <p class="text-xs text-neutral-400 font-mono">
-            Before hitting the trail, spend your budget on food rations, ammunition/distraction coins, and emergency repair kits. You can also save cash for road tolls and motels along the way.
-          </p>
+          <!-- Storekeeper Story Dialogue Banner -->
+          <div class="p-3 bg-black/60 border border-amber-500/50 rounded-lg flex items-start space-x-3 text-xs font-mono">
+            <span class="text-xl shrink-0" x-text="cartridgeId === 'pacific_2026' ? '🔧' : '🤠'"></span>
+            <div>
+              <strong class="text-amber-400" x-text="cartridgeId === 'pacific_2026' ? 'Dazza (Workshop Foreman):' : 'Matt (Storekeeper):'"></strong>
+              <p class="text-neutral-200 italic mt-0.5"
+                 x-text="cartridgeId === 'pacific_2026' ? '“Right Dad, you\'re packing three kids, a roof pod, and an esky to drive 900 ks up the M1 in 35-degree heat. You need at least 40% roadworthy tyres to legally depart, but 60–80% will save your transmission on Hawkesbury hill!”' : '“There are 2 oxen in a yoke. I recommend at least 3 yokes (6 oxen), but you need at least 2 yokes just to budge this prairie schooner off the grass. Don\'t skimp on oxen, pioneer!”'"></p>
+            </div>
+          </div>
 
           <!-- Catalog Item Rows -->
-          <div class="space-y-2 pt-2">
+          <div class="space-y-2 pt-1">
             <template x-for="item in (cartridgeData.outfitter || [])" :key="item.id">
               <div class="bg-neutral-900/90 border border-neutral-800 rounded-lg p-3 flex items-center justify-between text-xs font-mono">
                 <div class="space-y-0.5 pr-4">
-                  <span class="font-bold text-neutral-200" x-text="item.label"></span>
+                  <div class="flex items-center space-x-2">
+                    <span class="text-sm" x-text="item.id === 'traction' ? (cartridgeId === 'pacific_2026' ? '🛞' : '🐂') : (item.id === 'food' ? (cartridgeId === 'pacific_2026' ? '🥪' : '🌾') : (item.id === 'ammo' ? (cartridgeId === 'pacific_2026' ? '🍟' : '💥') : '🔧'))"></span>
+                    <span class="font-bold text-neutral-200" x-text="item.label"></span>
+                  </div>
                   <span class="text-[10px] text-neutral-400 block"
-                        x-text="'$' + (item.unitCostCents / 100).toFixed(2) + ' per ' + item.unitLabel + (item.bundleSize > 1 ? ' (+' + item.bundleSize + ' per pack)' : '')"></span>
+                        x-text="'$' + (item.unitCostCents / 100).toFixed(2) + ' per ' + item.unitLabel + (item.bundleSize > 1 ? ' (+' + item.bundleSize + (item.id === 'traction' ? '% Traction' : ' per pack') + ')' : '')"></span>
+                  <template x-if="item.description">
+                    <span class="text-[9px] text-amber-500/80 block italic" x-text="item.description"></span>
+                  </template>
                 </div>
 
                 <!-- Quantity Controls & Subtotal -->
@@ -205,15 +217,23 @@
             </template>
           </div>
 
-          <!-- Budget Summary -->
-          <div class="bg-black/60 border border-neutral-800 rounded-lg p-3 flex items-center justify-between text-xs font-mono mt-4">
-            <div>
-              <span class="text-neutral-400">Total Provisions Cost: </span>
-              <strong class="text-amber-400" x-text="'$' + (getCartTotalCents() / 100).toFixed(2)"></strong>
+          <!-- Budget & Propulsion Summary -->
+          <div class="bg-black/60 border border-neutral-800 rounded-lg p-3 grid grid-cols-3 gap-2 text-xs font-mono mt-3 text-center">
+            <div class="border-r border-neutral-800 pr-2 text-left">
+              <span class="text-neutral-400 text-[10px] block uppercase">Total Cost</span>
+              <strong class="text-amber-400 text-sm" x-text="'$' + (getCartTotalCents() / 100).toFixed(2)"></strong>
             </div>
-            <div>
-              <span class="text-neutral-400">Remaining Cash: </span>
-              <strong :class="ui.cashCents - getCartTotalCents() < 0 ? 'text-red-400' : 'text-emerald-400'"
+            <div class="border-r border-neutral-800 pr-2">
+              <span class="text-neutral-400 text-[10px] block uppercase" x-text="cartridgeId === 'pacific_2026' ? 'Roadworthiness' : 'Oxen Team'"></span>
+              <div class="mt-0.5">
+                <span class="font-bold text-sm" :class="((outfitterCart.traction || 0) * 20) < 40 ? 'text-red-400' : 'text-emerald-400'"
+                      x-text="((outfitterCart.traction || 0) * 20) + '%'"></span>
+                <span class="text-[9px] block text-neutral-400" x-text="((outfitterCart.traction || 0) * 20) < 40 ? '⚠️ Min 40% needed' : (cartridgeId === 'pacific_2026' ? 'Highway ready' : ((outfitterCart.traction || 0) * 2) + ' oxen hitched')"></span>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="text-neutral-400 text-[10px] block uppercase">Remaining Cash</span>
+              <strong class="text-sm block mt-0.5" :class="ui.cashCents - getCartTotalCents() < 0 ? 'text-red-400' : 'text-emerald-400'"
                       x-text="'$' + Math.max(0, (ui.cashCents - getCartTotalCents()) / 100).toFixed(2)"></strong>
             </div>
           </div>
@@ -701,6 +721,16 @@
               <span class="px-2 py-1 rounded bg-amber-900/60 text-amber-200 font-mono text-[10px] border border-amber-600/50 group-hover:border-amber-400">[5]</span>
             </button>
           </template>
+
+          <!-- [6] Ask Locals / Ferryman for Advice -->
+          <button @click="openTalkModal()"
+                  class="col-span-2 p-2 bg-neutral-800/80 hover:bg-neutral-750 border border-amber-600/50 rounded text-left flex items-center justify-between transition group">
+            <div class="flex items-center space-x-2">
+              <span class="text-amber-400">🗣️</span>
+              <span class="font-bold text-amber-300 text-xs" x-text="cartridgeId === 'pacific_2026' ? 'Ask Locals / Truckies for Advice' : 'Ask Ferryman / Locals for Advice'"></span>
+            </div>
+            <span class="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700 text-neutral-300 font-mono text-[10px] group-hover:border-amber-500/50">[T / 6]</span>
+          </button>
         </div>
       </div>
     </div>
@@ -754,9 +784,9 @@
         </div>
 
         <div class="flex justify-end pt-2 border-t border-neutral-800">
-          <button @click="modalType = null"
+          <button @click="closeMidTrailStore()"
                   class="px-4 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-mono text-xs border border-neutral-700">
-            Leave Store [Esc]
+            <span x-text="ui.activeObstacle ? (cartridgeId === 'pacific_2026' ? 'Proceed to Highway Bottleneck [Esc]' : 'Proceed to River Crossing [Esc]') : 'Leave Store [Esc]'"></span>
           </button>
         </div>
       </div>
@@ -774,7 +804,7 @@
               Each trade attempt costs 1 <span x-text="ui.timeUnit === 'legs' ? 'leg' : 'day'"></span> & daily rations. Pure goods-for-goods swap (no cash accepted).
             </div>
           </div>
-          <button @click="modalType = null; activeTradeState = null;"
+          <button @click="closeBarterModal()"
                   class="text-neutral-400 hover:text-white font-mono text-xs">[Esc]</button>
         </div>
 
@@ -850,7 +880,7 @@
                 </div>
 
                 <div class="flex space-x-3 pt-1">
-                  <button @click="modalType = null; activeTradeState = null;"
+                  <button @click="closeBarterModal()"
                           class="flex-1 py-2 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-mono text-xs border border-neutral-700">
                     Decline Deal [N / Esc]
                   </button>
@@ -969,7 +999,7 @@
         </div>
         <button @click="closeLandmarkCard()"
                 class="w-full py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded text-xs transition">
-          Return to Situation Deck [Space / Esc]
+          <span x-text="ui.activeObstacle ? (cartridgeId === 'pacific_2026' ? 'Proceed to Highway Bottleneck [Space / Esc]' : 'Proceed to River Crossing [Space / Esc]') : 'Return to Situation Deck [Space / Esc]'"></span>
         </button>
       </div>
     </div>
@@ -983,7 +1013,7 @@
             <span class="font-pixel text-xs text-amber-400" x-text="cartridgeId === 'pacific_2026' ? 'SERVO YARNS & LOCAL INTEL' : 'PIONEER RUMORS & LOCAL ADVICE'"></span>
             <span class="text-[10px] text-neutral-500" x-text="'(' + (talkIndex + 1) + '/' + (activeTalkPool.length || 1) + ')'"></span>
           </div>
-          <button @click="modalType = null" class="text-neutral-400 hover:text-white text-sm">[Esc]</button>
+          <button @click="closeTalkModal()" class="text-neutral-400 hover:text-white text-sm">[Esc]</button>
         </div>
 
         <div class="bg-black/60 p-4 rounded border border-neutral-800 space-y-3">
@@ -1000,9 +1030,9 @@
                   class="flex-1 py-2 rounded bg-neutral-800 hover:bg-neutral-750 text-amber-300 text-xs border border-neutral-700 font-bold transition">
             Next Advice / Yarn [Space / T]
           </button>
-          <button @click="modalType = null"
+          <button @click="closeTalkModal()"
                   class="flex-1 py-2 rounded bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition">
-            Back to Deck [Esc]
+            <span x-text="ui.activeObstacle ? (cartridgeId === 'pacific_2026' ? 'Proceed to Highway Bottleneck [Esc]' : 'Proceed to River Crossing [Esc]') : (arrivedWaypoint ? 'Back to Landmark [Esc]' : 'Back to Deck [Esc]')"></span>
           </button>
         </div>
       </div>

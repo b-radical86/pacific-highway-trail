@@ -345,7 +345,7 @@ if (solventEngine.cashCents !== 2500) {
   throw new Error('Solvent commercial fee not deducted: ' + solventEngine.cashCents);
 }
 
-// 11. CoreTrailEngine: buySupplies outfitter store checkout
+// 11. CoreTrailEngine: buySupplies outfitter store checkout & traction propulsion
 const shopEngine = new CoreTrailEngine({
   cartridgeId: 'pacific_2026',
   cashCents: 10000,
@@ -353,18 +353,31 @@ const shopEngine = new CoreTrailEngine({
 });
 const testCatalog = [
   { id: 'food', label: 'Snacks', unitCostCents: 1500, bundleSize: 5 },
-  { id: 'ammo', label: 'Coins', unitCostCents: 1000, bundleSize: 10 }
+  { id: 'ammo', label: 'Coins', unitCostCents: 1000, bundleSize: 10 },
+  { id: 'traction', label: 'Tyres', unitCostCents: 2000, bundleSize: 20 }
 ];
 const buyFail = shopEngine.buySupplies({ food: 10 }, testCatalog);
 if (buyFail.success !== false || buyFail.reason !== 'INSUFFICIENT_FUNDS') {
   throw new Error('buySupplies should fail on insufficient funds');
 }
-const buyOk = shopEngine.buySupplies({ food: 2, ammo: 1 }, testCatalog);
-if (!buyOk.success || buyOk.spentCents !== 4000 || shopEngine.cashCents !== 6000) {
+const buyOk = shopEngine.buySupplies({ food: 2, ammo: 1, traction: 2 }, testCatalog);
+if (!buyOk.success || buyOk.spentCents !== 8000 || shopEngine.cashCents !== 2000) {
   throw new Error('buySupplies checkout deduction failed: ' + JSON.stringify(buyOk));
 }
 if (shopEngine.supplies.food !== 10 || shopEngine.supplies.ammo !== 10) {
   throw new Error('Inventory bundles mismatch: ' + JSON.stringify(shopEngine.supplies));
+}
+if (shopEngine.traction !== 100) {
+  // Started at 100 default, +40 clamped to 100
+  throw new Error('Traction cap mismatch: ' + shopEngine.traction);
+}
+
+// Outfitter catalogs must include traction (oxen / roadworthiness)
+if (
+  OREGON_1848_CARTRIDGE.outfitter[0].id !== 'traction' ||
+  PACIFIC_2026_CARTRIDGE.outfitter[0].id !== 'traction'
+) {
+  throw new Error('Outfitter catalogs must have traction as first item');
 }
 
 // 12. Deliverable 1: Mid-Trail General Stores & Price Gouging

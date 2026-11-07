@@ -240,8 +240,16 @@ export const PACIFIC_2026_CARTRIDGE = {
     hamish: 1.25,        // ~56 km/leg ('Hamish Mode' right-lane overtakes)
   },
 
-  // Servo & Woolies Pre-Departure Outfitter
+  // Dazza's Ultra Tune & Woolies Outfitter
   outfitter: [
+    {
+      id: 'traction',
+      label: 'Pre-Trip Road Service & Tyres (Ultra Tune / Bob Jane)',
+      unitCostCents: 6000,
+      bundleSize: 20,
+      unitLabel: 'tier',
+      description: 'Fresh rubber, brake check & 98 fuel. Dazza requires min 40% roadworthiness to legally merge onto M1.',
+    },
     { id: 'food', label: 'Car Snacks (Shapes, Freddo Frogs, Sultanas)', unitCostCents: 250, bundleSize: 5, unitLabel: 'pkts' },
     { id: 'ammo', label: 'Hot Chips & 50¢ Distraction Coins', unitCostCents: 100, bundleSize: 5, unitLabel: 'units' },
     { id: 'partA', label: 'Emergency Nappy & Wet-Wipe Kit', unitCostCents: 1500, bundleSize: 1, unitLabel: 'kit' },

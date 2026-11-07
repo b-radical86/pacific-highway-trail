@@ -79,3 +79,7 @@ Rationale: Restores the iconic rhythmic cadence and tension of 1985 MECC Oregon 
 Date: 2026-11-07
 Decision: Fix river obstacle waiting loop (`action === 'delay'`) to retain the player on the riverbank, prevent unintended auto-crossing animation, display live conditions (Depth/Width/Weather) with decay notices, and guard trail progression until an explicit crossing action succeeds.
 Rationale: Resolves critical bug where selecting 'Wait to see if conditions improve' triggered the crossing animation and bypassed the river obstacle instead of advancing 1 day/rations on the bank to let river conditions recede.
+
+Date: 2026-11-07
+Decision: Implement authentic 1985 MECC departure propulsion/traction investment loop (`traction`) across both outfitter stores (Draft Oxen yokes for 1848; Dazza's Ultra Tune Pre-Trip Tyres & Service for 2026), enforcing 40% minimum roadworthiness departure gates and trading starting capital against travel velocity and breakdown resilience.
+Rationale: Restores the foundational MECC economic dilemma where purchasing draft power/vehicle roadworthiness directly reduces available starting capital for provisions, spare parts, and tolls.

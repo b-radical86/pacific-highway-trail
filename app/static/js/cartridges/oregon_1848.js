@@ -290,8 +290,16 @@ export const OREGON_1848_CARTRIDGE = {
 
   // Outfitter Catalog (Matt's General Store)
   outfitter: [
-    { id: 'food', label: 'Provisions (Bacon, Flour, Sugar)', unitCostCents: 20, bundleSize: 10, unitLabel: 'lbs' },
-    { id: 'ammo', label: 'Ammunition (Lead & Powder)', unitCostCents: 200, bundleSize: 20, unitLabel: 'rounds' },
+    {
+      id: 'traction',
+      label: 'Draft Oxen (1 Yoke = 2 Oxen)',
+      unitCostCents: 4000,
+      bundleSize: 20,
+      unitLabel: 'yoke',
+      description: 'Essential draft power. Matt recommends 3–4 yokes (6–8 oxen). Min 2 yokes required to pull wagon.',
+    },
+    { id: 'food', label: 'Provisions (Bacon, Flour, Sugar, Beans)', unitCostCents: 20, bundleSize: 10, unitLabel: 'lbs' },
+    { id: 'ammo', label: 'Ammunition (Lead & Powder Boxes)', unitCostCents: 200, bundleSize: 20, unitLabel: 'rounds' },
     { id: 'partA', label: 'Spare Wagon Wheel', unitCostCents: 1000, bundleSize: 1, unitLabel: 'wheel' },
     { id: 'partB', label: 'Spare Wagon Axle', unitCostCents: 1000, bundleSize: 1, unitLabel: 'axle' },
     { id: 'partC', label: 'Spare Wagon Tongue', unitCostCents: 1000, bundleSize: 1, unitLabel: 'tongue' },

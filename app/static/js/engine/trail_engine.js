@@ -514,7 +514,11 @@ export class CoreTrailEngine {
       if (qty <= 0) continue;
       const catItem = catalog.find((i) => i.id === itemKey);
       const unitsAdded = qty * (catItem?.bundleSize || 1);
-      this.supplies[itemKey] = (this.supplies[itemKey] || 0) + unitsAdded;
+      if (itemKey === 'traction') {
+        this.traction = Math.min(this.maxTraction, (this.traction || 0) + unitsAdded);
+      } else {
+        this.supplies[itemKey] = (this.supplies[itemKey] || 0) + unitsAdded;
+      }
     }
 
     this.logs.push(`Purchased provisions: Spent $${(totalCostCents / 100).toFixed(2)}.`);

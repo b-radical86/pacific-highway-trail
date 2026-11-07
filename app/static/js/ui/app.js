@@ -242,7 +242,8 @@ export function createTrailApp() {
         outfitter: this.cartridgeData.outfitter,
         barterConfig: this.cartridgeData.barterConfig,
         party: this.cartridgeData.defaultParty,
-        supplies: { food: 5, ammo: 5, partA: 0, partB: 0, partC: 0 },
+        traction: 0,
+        supplies: { food: 0, ammo: 0, partA: 0, partB: 0, partC: 0 },
         tPar: this.cartridgeData.tPar,
         kt: this.cartridgeData.kt,
       });
@@ -257,8 +258,8 @@ export function createTrailApp() {
       this.initEngine(this.cartridgeId, idx);
       this.outfitterCart =
         this.cartridgeId === 'pacific_2026'
-          ? { food: 6, ammo: 4, partA: 1, partB: 1, partC: 1 }
-          : { food: 8, ammo: 5, partA: 1, partB: 1, partC: 1 };
+          ? { traction: 3, food: 6, ammo: 4, partA: 1, partB: 1, partC: 1 }
+          : { traction: 3, food: 8, ammo: 5, partA: 1, partB: 1, partC: 1 };
       this.warningModal = null;
       this.screen = 'OUTFITTER';
     },
@@ -289,8 +290,23 @@ export function createTrailApp() {
         return;
       }
 
-      // Check for zero-food departure suicide
+      // Check for zero-traction / insufficient oxen departure
       const catalog = this.cartridgeData.outfitter || [];
+      const tractionItem = catalog.find((i) => i.id === 'traction');
+      const tractionPurchased = (this.outfitterCart.traction || 0) * (tractionItem?.bundleSize || 20);
+      const totalTractionAfterPurchase = (this._engine.traction || 0) + tractionPurchased;
+
+      if (totalTractionAfterPurchase < 40) {
+        sound.playStinkBuzzer();
+        const warning =
+          this.cartridgeId === 'pacific_2026'
+            ? "Dazza's Warning: Mate, you've got bald tyres and no oil in the sump! Highway Patrol will impound your rig before you even hit the Hawkesbury. Buy at least 2 tyre & service tiers (40% roadworthiness) before departing."
+            : "Matt's Warning: You can't leave Independence with less than 2 yokes of oxen (4 oxen)! Your prairie schooner is too heavy to budge. Buy at least 2 yokes before hitting the trail.";
+        alert(warning);
+        return;
+      }
+
+      // Check for zero-food departure suicide
       const foodItem = catalog.find((i) => i.id === 'food');
       const foodPurchased = (this.outfitterCart.food || 0) * (foodItem?.bundleSize || 1);
       const totalFoodAfterPurchase = (this._engine.supplies.food || 0) + foodPurchased;
@@ -515,11 +531,13 @@ export function createTrailApp() {
     },
 
     closeLandmarkCard() {
-      this.modalType = null;
       if (this._engine.activeObstacle) {
         this.obstacleNotice = '';
         this.activeObstacle = this._engine.activeObstacle;
         this.modalType = 'OBSTACLE';
+      } else {
+        this.arrivedWaypoint = null;
+        this.modalType = null;
       }
     },
 
@@ -532,6 +550,43 @@ export function createTrailApp() {
       this.activeTalkPool = pool;
       this.talkIndex = 0;
       this.modalType = 'TALK';
+    },
+
+    closeTalkModal() {
+      if (this._engine.activeObstacle) {
+        this.obstacleNotice = '';
+        this.activeObstacle = this._engine.activeObstacle;
+        this.modalType = 'OBSTACLE';
+      } else if (this.arrivedWaypoint) {
+        this.modalType = 'LANDMARK_CARD';
+      } else {
+        this.modalType = null;
+      }
+    },
+
+    closeMidTrailStore() {
+      if (this._engine.activeObstacle) {
+        this.obstacleNotice = '';
+        this.activeObstacle = this._engine.activeObstacle;
+        this.modalType = 'OBSTACLE';
+      } else if (this.arrivedWaypoint) {
+        this.modalType = 'LANDMARK_CARD';
+      } else {
+        this.modalType = null;
+      }
+    },
+
+    closeBarterModal() {
+      this.activeTradeState = null;
+      if (this._engine.activeObstacle) {
+        this.obstacleNotice = '';
+        this.activeObstacle = this._engine.activeObstacle;
+        this.modalType = 'OBSTACLE';
+      } else if (this.arrivedWaypoint) {
+        this.modalType = 'LANDMARK_CARD';
+      } else {
+        this.modalType = null;
+      }
     },
 
     nextTalkQuote() {
@@ -776,8 +831,14 @@ export function createTrailApp() {
         return;
       }
       sound.playFanfare();
-      this.modalType = null;
       this.activeTradeState = null;
+      if (this._engine.activeObstacle) {
+        this.obstacleNotice = '';
+        this.activeObstacle = this._engine.activeObstacle;
+        this.modalType = 'OBSTACLE';
+      } else {
+        this.modalType = null;
+      }
       this.syncSnapshot();
       this.autoSave();
     },
@@ -1032,7 +1093,7 @@ export function createTrailApp() {
         if (e.code === 'Space' || e.key === 't' || e.key === 'T') {
           this.nextTalkQuote();
         } else if (e.key === 'Escape' || e.key === 'Enter') {
-          this.modalType = null;
+          this.closeTalkModal();
         }
         return;
       }
@@ -1066,12 +1127,13 @@ export function createTrailApp() {
         if (e.key === '3') this.resolveObstacle('pay');
         if (e.key === '4') this.resolveObstacle('delay');
         if (e.key === '5' && this.activeObstacle?.guideCost) this.resolveObstacle('guide');
+        if (e.key === '6' || e.key === 't' || e.key === 'T') this.openTalkModal();
         return;
       }
 
       if (this.modalType === 'MID_STORE') {
         if (e.key === 'Escape') {
-          this.modalType = null;
+          this.closeMidTrailStore();
           return;
         }
         const idx = parseInt(e.key, 10) - 1;
@@ -1083,8 +1145,7 @@ export function createTrailApp() {
 
       if (this.modalType === 'BARTER') {
         if (e.key === 'Escape') {
-          this.modalType = null;
-          this.activeTradeState = null;
+          this.closeBarterModal();
           return;
         }
         if (this.activeTradeState?.step === 'SELECT') {
@@ -1098,8 +1159,7 @@ export function createTrailApp() {
           if ((e.key === 'y' || e.key === 'Y' || e.key === 'Enter') && offer && offer.canAfford) {
             this.confirmTradeDeal();
           } else if (e.key === 'n' || e.key === 'N' || e.key === 'Escape') {
-            this.modalType = null;
-            this.activeTradeState = null;
+            this.closeBarterModal();
           }
         }
         return;
