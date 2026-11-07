@@ -102,6 +102,29 @@
             </p>
           </div>
 
+          <!-- Resume Active Journey Card (If Saved Game Exists) -->
+          <div x-show="hasSavedGame" x-transition.opacity
+               class="p-4 rounded-xl border-2 border-emerald-500/80 bg-emerald-950/40 backdrop-blur-sm flex items-center justify-between shadow-2xl">
+            <div class="space-y-1">
+              <div class="flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span class="font-pixel text-[10px] text-emerald-300">ACTIVE EXPEDITION DETECTED</span>
+                <span class="text-[9px] font-mono text-neutral-400" x-text="'Saved: ' + (savedGameMeta?.savedAt ? new Date(savedGameMeta.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '')"></span>
+              </div>
+              <div class="text-xs font-mono text-neutral-200">
+                Turn <strong class="text-amber-400" x-text="savedGameMeta?.turn"></strong> •
+                Distance: <strong class="text-amber-400" x-text="savedGameMeta?.distance + ' ' + (cartridgeId === 'pacific_2026' ? 'km' : 'mi')"></strong> •
+                Food: <strong class="text-neutral-100" x-text="savedGameMeta?.supplies?.food"></strong>
+              </div>
+            </div>
+
+            <button @click="resumeSavedGame()"
+                    class="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold font-mono text-xs rounded-lg shadow-lg transition active:scale-[0.98] flex items-center space-x-2">
+              <span>Resume Saved Trail</span>
+              <span class="bg-emerald-700/40 text-neutral-950 px-1.5 py-0.5 rounded text-[10px]">[C]</span>
+            </button>
+          </div>
+
           <!-- 3 Archetype Cards -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
             <template x-for="(occ, idx) in cartridgeData.occupations" :key="occ.id">

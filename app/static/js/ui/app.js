@@ -38,6 +38,8 @@ export function createTrailApp() {
     playerName: 'Brad & Family',
     epitaphText: '',
     leaderboard: [],
+    hasSavedGame: false,
+    savedGameMeta: null,
 
     // UI Controls & Toggles
     crtEnabled: false,
@@ -90,11 +92,50 @@ export function createTrailApp() {
         window.trailApp = this;
       }
       this.soundMuted = sound.muted;
+      this.checkSavedGame();
       this.initEngine(this.cartridgeId);
       this.initCanvas();
       this.syncSnapshot();
       await this.loadMemorials(this.cartridgeId);
       sound.unlock();
+    },
+
+    checkSavedGame() {
+      const save = StorageManager.loadGame();
+      if (save && save.cartridgeId === this.cartridgeId && save.distance > 0) {
+        this.hasSavedGame = true;
+        this.savedGameMeta = {
+          distance: save.distance,
+          turn: save.turn,
+          savedAt: save.savedAt,
+          supplies: save.supplies,
+        };
+      } else {
+        this.hasSavedGame = false;
+        this.savedGameMeta = null;
+      }
+    },
+
+    resumeSavedGame() {
+      const save = StorageManager.loadGame();
+      if (!save || save.cartridgeId !== this.cartridgeId) return;
+
+      sound.playFanfare();
+      this.initEngine(this.cartridgeId, save.occupationIdx || 0);
+
+      // Restore saved engine properties
+      this._engine.distance = save.distance;
+      this._engine.turn = save.turn;
+      this._engine.cashCents = save.cashCents;
+      this._engine.party = JSON.parse(JSON.stringify(save.party));
+      this._engine.supplies = { ...save.supplies };
+      this._engine.resolvedWaypoints = new Set(save.resolvedWaypoints || []);
+      if (this._eventManager && save.flags) {
+        this._eventManager.flags = { ...save.flags };
+      }
+
+      this.screen = 'GAME';
+      this.syncSnapshot();
     },
 
     async loadMemorials(cartridgeId) {
@@ -120,6 +161,7 @@ export function createTrailApp() {
       if (!this._engine || this.ui.status !== 'IN_PROGRESS') return;
       StorageManager.saveGame({
         cartridgeId: this.cartridgeId,
+        occupationIdx: this.selectedOccupationIdx,
         distance: this._engine.distance,
         turn: this._engine.turn,
         cashCents: this._engine.cashCents,
@@ -317,6 +359,7 @@ export function createTrailApp() {
         this._canvasEngine.activeScene = null;
       }
       this.loadMemorials(newId);
+      this.checkSavedGame();
       this.modalType = null;
       this.miniGameActive = false;
       this.screen = 'SETUP';
@@ -752,6 +795,10 @@ export function createTrailApp() {
     },
 
     handleSetupKeys(e) {
+      if (this.hasSavedGame && (e.key === 'c' || e.key === 'C')) {
+        this.resumeSavedGame();
+        return;
+      }
       if (e.key === '1') this.selectDifficulty(0);
       else if (e.key === '2') this.selectDifficulty(1);
       else if (e.key === '3') this.selectDifficulty(2);
