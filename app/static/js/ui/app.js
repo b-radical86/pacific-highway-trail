@@ -16,6 +16,7 @@ import { sound, playLandmarkTheme } from './audio_synth.js';
 import { StorageManager } from '../engine/storage.js';
 import { OREGON_1848_CARTRIDGE } from '../cartridges/oregon_1848.js';
 import { PACIFIC_2026_CARTRIDGE } from '../cartridges/pacific_2026.js';
+import { getLandmarkCardDataUri } from '../cartridges/landmark_cards.js';
 
 export function createTrailApp() {
   return {
@@ -539,6 +540,12 @@ export function createTrailApp() {
         this.arrivedWaypoint = null;
         this.modalType = null;
       }
+    },
+
+    getLandmarkCardImage() {
+      const wp = this.arrivedWaypoint || this._engine?.getCurrentWaypoint();
+      if (!wp) return null;
+      return getLandmarkCardDataUri(wp.id) || getLandmarkCardDataUri(wp.cardKey);
     },
 
     openTalkModal() {

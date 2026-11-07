@@ -83,3 +83,7 @@ Rationale: Resolves critical bug where selecting 'Wait to see if conditions impr
 Date: 2026-11-07
 Decision: Implement authentic 1985 MECC departure propulsion/traction investment loop (`traction`) across both outfitter stores (Draft Oxen yokes for 1848; Dazza's Ultra Tune Pre-Trip Tyres & Service for 2026), enforcing 40% minimum roadworthiness departure gates and trading starting capital against travel velocity and breakdown resilience.
 Rationale: Restores the foundational MECC economic dilemma where purchasing draft power/vehicle roadworthiness directly reduces available starting capital for provisions, spare parts, and tolls.
+
+Date: 2026-11-07
+Decision: Add retro pixel-art landmark postcard optimizer (`scripts/optimize_landmarks.py`), export 320x200 256-color Base64 PNG registry (`app/static/js/cartridges/landmark_cards.js`) for Coffs Harbour (`wp_coffs`), Chimney Rock (`wp_chimney`), and Ballina (`wp_ballina`), and wire postcard rendering into the `LANDMARK_CARD` inspection modal.
+Rationale: Delivers authentic 320x200 8-bit indexed pixel-art landmark postcards with zero external runtime network requests or unbundled asset dependencies.

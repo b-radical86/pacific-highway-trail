@@ -55,6 +55,10 @@ import { PACIFIC_2026_CARTRIDGE } from './app/static/js/cartridges/pacific_2026.
 import { CanvasEngine } from './app/static/js/canvas/canvas_engine.js';
 import { RiverScene } from './app/static/js/scenes/river_scene.js';
 import { HuntScene } from './app/static/js/scenes/hunt_scene.js';
+import {
+  LANDMARK_CARDS,
+  getLandmarkCardDataUri
+} from './app/static/js/cartridges/landmark_cards.js';
 
 // 1. PRNG determinism & state restore
 const prng1 = new PRNG(12345);
@@ -596,6 +600,15 @@ if (hardHunt.biome !== 'WOODS' || hardHunt.maxTimer !== 16.0) {
 }
 if (hardHunt.speedFactor !== 1.45 || hardHunt.maxTargetDensity > 2) {
   throw new Error('Hard hunt target pacing not properly capped: ' + hardHunt.speedFactor);
+}
+
+// 16. Landmark Cards Registry Verification
+const requiredLandmarks = ['wp_coffs', 'wp_chimney', 'wp_ballina'];
+for (const lmKey of requiredLandmarks) {
+  const uri = getLandmarkCardDataUri(lmKey);
+  if (!uri || !uri.startsWith('data:image/png;base64,') || uri.length < 1000) {
+    throw new Error('Missing or invalid landmark card Data URI for ' + lmKey);
+  }
 }
 
 console.log('NODE_ESM_ASSERTIONS_PASSED');
