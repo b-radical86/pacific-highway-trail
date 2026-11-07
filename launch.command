@@ -16,15 +16,15 @@ else
     exit 1
 fi
 
-# Start uvicorn in the background if not already running on port 8000
+# Start uvicorn completely detached in background if not already running on port 8000
 if ! lsof -i :8000 >/dev/null 2>&1; then
-    nohup "$PYTHON_BIN" -m uvicorn app.main:app --port 8000 > logs/server.log 2>&1 &
+    (nohup "$PYTHON_BIN" -m uvicorn app.main:app --port 8000 </dev/null > logs/server.log 2>&1 &)
     sleep 1.2
 fi
 
 # Open default browser to the game UI
 open "http://127.0.0.1:8000"
 
-# Gracefully close the launcher Terminal window
-osascript -e 'tell application "Terminal" to close (every window whose name contains "launch.command")' 2>/dev/null || true
+# Detach and close the launcher Terminal window cleanly
+( sleep 0.5 && osascript -e 'tell application "Terminal" to close (every window whose name contains "launch.command")' ) >/dev/null 2>&1 &
 exit 0
