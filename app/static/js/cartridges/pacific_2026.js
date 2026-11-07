@@ -10,6 +10,179 @@
  * - 10 Hamish & Andy declarative hazards and dilemmas
  */
 
+export const PACIFIC_2026_TALK_POOLS = {
+  mooney_mooney: [
+    {
+      speaker: 'Dave (NRMA Tow Truckie eating a Chiko Roll)',
+      quote:
+        "Listen to me, mate: you've got three boys under seven and a Siberian cat in the boot of a loaded family bus. If you hammer the right lane on 'The Cannonball' pace, someone's throwing a full-blown tanty before the Gosford turnoff. Set cruise to 100, crack the air-con, and stick to 'Grand Cruise'.",
+    },
+    {
+      speaker: 'Kylie (Caravan Veteran in a 200 Series LandCruiser)',
+      quote:
+        "The Mooney Mooney bridge camera flashes both ways, champ. Don't try and slingshot down the hill past the logging trucks. And check your roof pod latch right now—if that thing pops at 110, your camping chairs will be all over the Hawkesbury.",
+    },
+    {
+      speaker: 'Brett (Stressed Dad pumping 98 Octane)',
+      quote:
+        "Whatever you do, don't let the kids start the Bluey iPad playlist yet. Burn through normal radio while they're still looking out the window at the sandstone cliffs. Save the screens for when the wheels really fall off around Karuah!",
+    },
+  ],
+  heatherbrae_pies: [
+    {
+      speaker: 'Shazza (Heatherbrae Bakery Legend)',
+      quote:
+        'Order the chunky steak and pepper pies, darl, and grab two bags of sausage rolls for the console. Once you pass Bulahdelah, the servo food turns into lukewarm plastic triangles that will give your driver the stomach wobbles before Coffs.',
+    },
+    {
+      speaker: 'Gaz (Tradie in Hi-Vis clutching an Oak Choccy Milk)',
+      quote:
+        "Mate, if you've got any 12V USB-C leads in the glovebox, hold onto 'em like gold. Some bloke over by the caravan pumps just offered me twenty bucks and a meat pie for an iPhone cord because his daughter's tablet died.",
+    },
+    {
+      speaker: 'Wendy (Grey Nomad washing her windscreen)',
+      quote:
+        "Bucketts Way shortcut ahead looks tempting on Google Maps, love, but it's eighty k's of winding potholed bitumen with logging trucks and zero phone reception. If your little ones get car sick, stay on the M1 dual carriageway.",
+    },
+  ],
+  bulahdelah: [
+    {
+      speaker: 'Mick (Driver Reviver Volunteer pouring instant blend)',
+      quote:
+        'Free tea, instant coffee, and an Arrowroot biscuit, mate! Take twenty minutes to let the boys kick a footy on the grass. A twenty-minute run in the park resets the backseat border wars better than any snack drop.',
+    },
+    {
+      speaker: 'Chloe (Mum juggling toddlers by the swing set)',
+      quote:
+        'Check the baby nappy before you strap them back in! Arthur looks comfortable now, but twenty minutes in a warm booster seat on the Pacific Highway will turn a damp pouch into an apocalyptic Code Brown. Do not risk it!',
+    },
+    {
+      speaker: 'Terry (Truckie on his compulsory logbook break)',
+      quote:
+        "Caravans are grouping up thick near Nabiac, mate. If you get stuck behind Gary doing 74 in the overtaking lane, don't ride his bumper and fry your brakes. Drop back, wait for the dual-lane grade, and pass clean.",
+    },
+  ],
+  port_macquarie: [
+    {
+      speaker: 'Brooke (Koala Hospital Volunteer)',
+      quote:
+        'Take the detour into Town Beach if your cabin sanity is below fifty percent! Twenty minutes watching the waves and letting the kids spot dolphins will cure that glassy-eyed thousand-yard stare both of you have got right now.',
+    },
+    {
+      speaker: 'Wayne (Local Fisherman in stubbies and thongs)',
+      quote:
+        'Highway servo prices past Port Macquarie are fair dinkum armed robbery. Seven dollars for a bottle of water and fifteen bucks for a sandwich! If you need supplies, pull into the real supermarket in town and load the esky.',
+    },
+    {
+      speaker: 'Garry (Dual-Cab Ranger owner)',
+      quote:
+        'East Coast low pressure trough is dumping rain over the Macleay floodplain ahead. When that spray kicks up off the B-doubles, visibility drops to two white posts. Check your wiper blades and turn your real headlights on, not just the daytime LEDs.',
+    },
+  ],
+  kempsey: [
+    {
+      speaker: 'Trevor (Macleay Valley Highway Patrol Officer)',
+      quote:
+        "Afternoon, folks. Everyone buckled up proper in rows two and three? Don't let the kids unclip their shoulder belts to reach dropped iPads under the seats. We've got radar set up along the bypass flats all long weekend.",
+    },
+    {
+      speaker: 'Baz (Grey Nomad hauling a 28ft Jayco)',
+      quote:
+        "G'day mate! Yeah, I know I'm sitting on 78 in a 110 zone, but Cheryl reckons the tow-ball oscillates if I hit eighty! We'll pull into the slow vehicle turnout eventually, but don't hold your breath—we're listening to an audiobook!",
+    },
+    {
+      speaker: 'Eileen (Local River Resident)',
+      quote:
+        "If the highway's backed up at the bridge, some folks try the old river flats detour. Don't do it in a front-wheel-drive family wagon; the causeway's got two inches of greasy river mud that will spin your street tyres in a heartbeat.",
+    },
+  ],
+  coffs_harbour: [
+    {
+      speaker: 'Banana Jim (Big Banana Staff in Yellow Visor)',
+      quote:
+        'Welcome to the Big Yellow Boss, mate! Look, do yourself a favor: buy the boys a chocolate-coated frozen banana and take the photo on the giant concrete step. If you drive past without stopping, the kids will stage a protest scream that will shatter your windscreen.',
+    },
+    {
+      speaker: 'Steve (Melbourne Dad doing the north run)',
+      quote:
+        "We tried the 'Look kids, a horse!' distraction at 110 km/h. Jack saw the banana from three kilometers out. Complete meltdown. Cost me forty-five minutes, thirty-two dollars, and my dignity. Just pull over, mate.",
+    },
+    {
+      speaker: 'Sandy (Cafe Attendant)',
+      quote:
+        'Double-shot flat white for the driver? Take two. The Coffs bypass roadworks ahead squeeze three lanes into one with concrete barriers. It is forty minutes of bumper-to-bumper clutch-slipping gridlock.',
+    },
+  ],
+  maclean: [
+    {
+      speaker: 'Uncle Col (Clarence Valley Cane Farmer)',
+      quote:
+        "Notice the telephone poles painted in Scottish tartan? You're in Maclean, champ. If you want the real coastal secret, take the turnoff out to Brooms Head or Iluka for twenty minutes. Best fish and chips on the east coast, and zero highway madness.",
+    },
+    {
+      speaker: 'Fiona (Campervan Traveller from Byron)',
+      quote:
+        'Clarence River vehicular ferry is running if the highway bridge is jammed, but it only takes six cars at a time. Unless you have twenty minutes to yarn with the ferryman about cane toads, stay on the bridge.',
+    },
+    {
+      speaker: 'Darren (Tradie towing a jet ski)',
+      quote:
+        "Highway's wide and smooth through the cane fields here—you can finally make good time! Just watch for coastal emus wandering out of the scrub near the national park. Hitting an emu at a hundred will total your radiator.",
+    },
+  ],
+  ballina: [
+    {
+      speaker: 'Mick (Prawn Trawler Deckhand at the Big Prawn)',
+      quote:
+        'Grab a kilo of fresh school prawns from the co-op, mate! Tailgate lunch right under the giant fiberglass prawn. Just make sure the boys do not drop prawn heads down the car door cup holders—twenty-four hours in sub-tropical sun and your SUV will smell like an open sewer forever.',
+    },
+    {
+      speaker: 'Bec (Byron Hinterland Commuter)',
+      quote:
+        'Byron Bay turnoff ahead is gridlocked with campervans and kombis trying to find parking. Do not take the scenic lighthouse detour unless you want to spend two hours idling in first gear while the kids kick your back seat.',
+    },
+    {
+      speaker: 'Russ (Retired Truckie)',
+      quote:
+        "You're entering the home stretch now, but don't lose your focus. The dual lanes through the St Helena tunnel have speed cameras on both portals. Keep cruise locked to 110 and let the impatient utes tailgate all they want.",
+    },
+  ],
+  tugun_border: [
+    {
+      speaker: 'Gold Coast Merge Warden (Traffic Controller in Neon)',
+      quote:
+        'Welcome to the Sunshine State merge, legend! Three lanes of M1 traffic squeezed down into Gold Coast holiday madness at thirty-two degrees. If the air-con isn not blowing arctic and the snacks are not flowing, you are in for a rough run.',
+    },
+    {
+      speaker: 'Liam (Surfer in a beaten-up Subaru)',
+      quote:
+        'Currumbin bottleneck ahead! If you have snacks left in your esky, this is where you deploy the nuclear option. Give Jack and Oliver the Freddo Frogs and put Arthur pacifier in right now. It is twenty k of stop-start brake lights to Nerang.',
+    },
+    {
+      speaker: 'Barb (Tweed Heads Local)',
+      quote:
+        'Almost in Brisbane, love! Just watch the lane merges after the airport tunnel. Keep Brad focused on the overhead gantry signs for the Gateway Motorway—miss that exit and you will find yourself touring Surfers Paradise high-rises with a screaming two-year-old!',
+    },
+  ],
+  brisbane_arrival: [
+    {
+      speaker: 'Neighbour Kev (Leaning on the Fence with a Coldie)',
+      quote:
+        "G'day Brad, g'day Tegan! You made it! Look at that roof pod—covered in bugs from the Clarence Valley, but the wagon's in one piece. Step out of the car, leave the bags in the boot for tomorrow, and crack a cold one. You survived the M1!",
+    },
+    {
+      speaker: 'Grandma Carter (Standing at the Front Door)',
+      quote:
+        'Look at my beautiful boys! Jack, Oliver, Arthur! Come inside and get a real home-cooked meal. Did your father try to do the whole nine hundred kilometers without stopping for a proper sit-down lunch again?',
+    },
+    {
+      speaker: 'Maple (Stretching Out of the Pet Carrier)',
+      quote:
+        '*Prrrr-meow!* (Translation: The acoustic trials of the St Helena tunnel were severe, human, but my paws are once again on solid northern ground. Bring me tuna immediately.)',
+    },
+  ],
+};
+
 export const PACIFIC_2026_CARTRIDGE = {
   id: 'pacific_2026',
   title: 'The M1 Gauntlet (2026)',
@@ -107,7 +280,7 @@ export const PACIFIC_2026_CARTRIDGE = {
     ],
   },
 
-  // 10 Waypoints from Sydney Harbour to Brisbane River
+  // Waypoints from Sydney Harbour to Brisbane River
   waypoints: [
     {
       id: 'wp_sydney',
@@ -117,12 +290,14 @@ export const PACIFIC_2026_CARTRIDGE = {
       servoStop: true,
       hasStore: true,
       storeName: 'Woolworths & Servo Express (Pennant Hills)',
+      talkPool: PACIFIC_2026_TALK_POOLS.mooney_mooney,
       isCheckpoint: true,
     },
     {
       id: 'wp_hawkesbury',
       name: 'Hawkesbury River Bridge',
       distance: 55,
+      talkPool: PACIFIC_2026_TALK_POOLS.mooney_mooney,
       obstacle: { type: 'gridlock', phi: 0.50, psi: 0.40, costCents: 500, label: 'Holiday Merge Gridlock' },
     },
     {
@@ -133,6 +308,33 @@ export const PACIFIC_2026_CARTRIDGE = {
       servoStop: true,
       hasStore: true,
       storeName: 'Heatherbrae Highway Servo & Pie Warmers',
+      talkPool: PACIFIC_2026_TALK_POOLS.heatherbrae_pies,
+      isBranchPoint: true,
+      branches: [
+        {
+          id: 'bucketts',
+          label: 'Take Bucketts Way / Putty Shortcut (-40 km, no police, 1.6x motion sickness & potholes)',
+          distanceDelta: -40,
+          hazardMult: 1.6,
+        },
+        {
+          id: 'm1_coastal',
+          label: 'Stay on M1 Pacific Motorway (+25 km, smooth cruising & servos)',
+          distanceDelta: 25,
+          hazardMult: 0.9,
+        },
+      ],
+      isCheckpoint: true,
+    },
+    {
+      id: 'wp_bulahdelah',
+      name: 'Bulahdelah Driver Reviver',
+      distance: 235,
+      landmark: true,
+      servoStop: true,
+      hasStore: true,
+      storeName: 'Bulahdelah Roadhouse & Driver Reviver',
+      talkPool: PACIFIC_2026_TALK_POOLS.bulahdelah,
       isCheckpoint: true,
     },
     {
@@ -143,6 +345,7 @@ export const PACIFIC_2026_CARTRIDGE = {
       servoStop: true,
       hasStore: true,
       storeName: 'Port Macquarie 24hr Highway Roadhouse',
+      talkPool: PACIFIC_2026_TALK_POOLS.port_macquarie,
       isCheckpoint: true,
     },
     {
@@ -152,6 +355,7 @@ export const PACIFIC_2026_CARTRIDGE = {
       servoStop: true,
       hasStore: true,
       storeName: "Kempsey 24hr Neon Roadhouse ('Yes, the Sandwich is $14.50')",
+      talkPool: PACIFIC_2026_TALK_POOLS.kempsey,
       obstacle: {
         type: 'caravan',
         phi: 0.60,
@@ -170,9 +374,16 @@ export const PACIFIC_2026_CARTRIDGE = {
       servoStop: true,
       hasStore: true,
       storeName: 'Coffs Harbour Big Banana Gift Shop & Servo',
+      talkPool: PACIFIC_2026_TALK_POOLS.coffs_harbour,
       isCheckpoint: true,
     },
-    { id: 'wp_maclean', name: 'Maclean & Brooms Head Turnoff', distance: 660, landmark: true },
+    {
+      id: 'wp_maclean',
+      name: 'Maclean & Brooms Head Turnoff',
+      distance: 660,
+      landmark: true,
+      talkPool: PACIFIC_2026_TALK_POOLS.maclean,
+    },
     {
       id: 'wp_ballina',
       name: 'Ballina Big Prawn & Byron Hinterland',
@@ -181,6 +392,22 @@ export const PACIFIC_2026_CARTRIDGE = {
       servoStop: true,
       hasStore: true,
       storeName: 'Ballina Highway Oasis & Bait Shop',
+      talkPool: PACIFIC_2026_TALK_POOLS.ballina,
+      isBranchPoint: true,
+      branches: [
+        {
+          id: 'coastal_strip',
+          label: 'Take Gold Coast Highway Coastal Strip (Free, beach traffic & lights)',
+          distanceDelta: 15,
+          hazardMult: 1.4,
+        },
+        {
+          id: 'tugun_bypass',
+          label: 'Take M1 Tugun Bypass / Express Lane (Toll/bribe option, high speed)',
+          distanceDelta: -10,
+          hazardMult: 0.85,
+        },
+      ],
       isCheckpoint: true,
     },
     {
@@ -190,6 +417,7 @@ export const PACIFIC_2026_CARTRIDGE = {
       servoStop: true,
       hasStore: true,
       storeName: 'Tugun Border Express Mart',
+      talkPool: PACIFIC_2026_TALK_POOLS.tugun_border,
       obstacle: {
         type: 'gridlock',
         phi: 0.70,
@@ -199,7 +427,15 @@ export const PACIFIC_2026_CARTRIDGE = {
         guideCost: { slot: 'food', qty: 25, label: 'Choccy Milk & Red Frog Peace Accord (25 Snacks)' },
       },
     },
-    { id: 'wp_brisbane', name: 'Brisbane River / Northern Suburbs', distance: 920, landmark: true, goal: true, isCheckpoint: true },
+    {
+      id: 'wp_brisbane',
+      name: 'Brisbane River / Northern Suburbs',
+      distance: 920,
+      landmark: true,
+      goal: true,
+      talkPool: PACIFIC_2026_TALK_POOLS.brisbane_arrival,
+      isCheckpoint: true,
+    },
   ],
 
   // 10 Declarative Hamish & Andy Road Trip Hazards

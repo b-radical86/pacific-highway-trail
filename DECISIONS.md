@@ -67,3 +67,7 @@ Rationale: Adds visual and temporal gravitas to resting by visibly passing an en
 Date: 2026-11-07
 Decision: Implement Phase 1 authentic 1985 MECC engine features (`attemptBlindTrade`, river depth/width decay on `delay`, ferry wait days on `pay`, route branch selection `selectBranch`, and distance inflation `gamma = 1.65`).
 Rationale: Establishes blind barter proposal loops, temporal river receding dynamics with queue wait costs, and dynamic fork kinematics directly within headless engine architecture.
+
+Date: 2026-11-07
+Decision: Populate Phase 2 contextual `talkPool` NPC dialogue registries and route branches across both `oregon_1848.js` and `pacific_2026.js` (South Pass/Sublette, The Dalles/Barlow, Karuah/Bucketts Way, Ballina/Tugun Bypass).
+Rationale: Infuses authentic historical advice and Aussie road-trip humor while mechanically guiding players on oxen counts, ration pacing, river depth thresholds, and branch shortcuts.

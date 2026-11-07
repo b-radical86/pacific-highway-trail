@@ -125,6 +125,25 @@ if (PACIFIC_2026_CARTRIDGE.events.length !== 10) {
   throw new Error('2026 events mismatch: ' + PACIFIC_2026_CARTRIDGE.events.length);
 }
 
+// Phase 2 Schema Check: Every waypoint must have >= 2 talkPool dialogues
+for (const cart of [OREGON_1848_CARTRIDGE, PACIFIC_2026_CARTRIDGE]) {
+  for (const wp of cart.waypoints) {
+    if (!Array.isArray(wp.talkPool) || wp.talkPool.length < 2) {
+      throw new Error(`Waypoint ${wp.id} in ${cart.id} is missing valid talkPool`);
+    }
+    for (const entry of wp.talkPool) {
+      if (!entry.speaker || !entry.quote || entry.quote.length < 5) {
+        throw new Error(`Invalid talkPool quote at ${wp.id} in ${cart.id}`);
+      }
+    }
+    if (wp.isBranchPoint) {
+      if (!Array.isArray(wp.branches) || wp.branches.length < 2) {
+        throw new Error(`Branch point ${wp.id} missing branches in ${cart.id}`);
+      }
+    }
+  }
+}
+
 const eventEngine = new CoreTrailEngine({
   cartridgeId: PACIFIC_2026_CARTRIDGE.id,
   party: PACIFIC_2026_CARTRIDGE.defaultParty,
