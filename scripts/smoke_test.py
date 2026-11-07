@@ -383,6 +383,48 @@ if (buyTooExpensive.success !== false || buyTooExpensive.reason !== 'INSUFFICIEN
   throw new Error('Expected INSUFFICIENT_FUNDS failure');
 }
 
+// 13. Deliverable 2: On-Demand Barter & Desperation Multiplier
+const barterEngine = new CoreTrailEngine({
+  cartridgeId: 'oregon_1848',
+  prngSeed: 99999,
+  cashCents: 4200,
+  barterConfig: OREGON_1848_CARTRIDGE.barterConfig,
+  party: [{ name: 'Ezekiel', role: 'primary', health: 100, morale: 100, statusEffects: [] }],
+  supplies: { food: 30, ammo: 40, partA: 0, partB: 2, partC: 2 }
+});
+// Seek partA (which player has 0 of -> triggers 1.75x desperation multiplier)
+let tradeRes = null;
+for (let i = 0; i < 10; i++) {
+  const attempt = barterEngine.initiateTradeAttempt('partA');
+  if (attempt.foundTrader) {
+    tradeRes = attempt;
+    break;
+  }
+}
+if (!tradeRes || !tradeRes.offer || tradeRes.offer.desperate !== true) {
+  throw new Error('Expected desperate trader offer for partA: ' + JSON.stringify(tradeRes));
+}
+if (tradeRes.offer.mDesp !== 1.75) {
+  throw new Error('Expected mDesp=1.75, got: ' + tradeRes.offer.mDesp);
+}
+if (barterEngine.turn <= 1 || barterEngine.supplies.food >= 30) {
+  throw new Error('Trade attempt must advance turn and consume rations');
+}
+// Top up demanded slot to ensure affordability and accept deal
+const dSlot = tradeRes.offer.demandSlotKey;
+if (dSlot === 'traction') {
+  barterEngine.traction = 100;
+} else {
+  barterEngine.supplies[dSlot] = 100;
+}
+const acceptRes = barterEngine.acceptTradeOffer(tradeRes.offer);
+if (!acceptRes.success || barterEngine.supplies.partA !== 1) {
+  throw new Error('acceptTradeOffer failed to grant partA: ' + JSON.stringify(acceptRes));
+}
+if (barterEngine.cashCents !== 4200) {
+  throw new Error('Barter must never modify cashCents, got: ' + barterEngine.cashCents);
+}
+
 console.log('NODE_ESM_ASSERTIONS_PASSED');
 """
     result = subprocess.run(

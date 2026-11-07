@@ -76,6 +76,7 @@ export class CoreTrailEngine {
     this.status = 'IN_PROGRESS'; // 'IN_PROGRESS' | 'WON' | 'DIED' | 'U_TURN'
     this.dadEgo = 0;
     this.activeObstacle = null;
+    this.activeTradeOffer = null;
     this.logs = [];
   }
 
@@ -614,6 +615,178 @@ export class CoreTrailEngine {
       unitsAdded,
       spentCents: totalCostCents,
       remainingCashCents: this.cashCents,
+    };
+  }
+
+  /**
+   * Attempts an on-demand barter trade with passersby on the trail or at a rest area.
+   * Immediately consumes 1 day/leg of time and daily rations regardless of whether
+   * a trader is found or a deal is accepted.
+   *
+   * @param {string} wantedSlotKey Supply slot ('food', 'ammo', 'traction', 'partA', 'partB', 'partC')
+   * @param {Object} [customBarterConfig] Optional barter configuration override
+   * @returns {Object} Trade attempt result and generated offer (if any)
+   */
+  initiateTradeAttempt(wantedSlotKey, customBarterConfig = null) {
+    if (this.status !== 'IN_PROGRESS') {
+      return { success: false, reason: 'GAME_OVER' };
+    }
+
+    const defaultSlots = {
+      food: { label: this.cartridgeId === 'pacific_2026' ? 'Servos Snacks' : 'lbs Food', baseQty: 25 },
+      ammo: { label: this.cartridgeId === 'pacific_2026' ? 'Coins / Fuel' : 'Bullets', baseQty: 20 },
+      traction: { label: this.cartridgeId === 'pacific_2026' ? '% Battery/Tyre' : 'Oxen Yoke', baseQty: 20 },
+      partA: { label: this.cartridgeId === 'pacific_2026' ? 'USB-C Cable' : 'Wagon Wheel', baseQty: 1 },
+      partB: { label: this.cartridgeId === 'pacific_2026' ? 'Coolant Bottle' : 'Wagon Axle', baseQty: 1 },
+      partC: { label: this.cartridgeId === 'pacific_2026' ? 'Wiper Blade' : 'Wagon Tongue', baseQty: 1 },
+    };
+
+    const cfg = customBarterConfig || this.barterConfig || {
+      noTradeText:
+        this.cartridgeId === 'pacific_2026'
+          ? 'No one in the servo carpark wants to swap gear right now.'
+          : 'Nobody meets your eye on the trail today. No trade.',
+      slots: defaultSlots,
+      archetypes: [
+        {
+          speaker: this.cartridgeId === 'pacific_2026' ? 'Grey Nomad in a Patrol' : 'Passing Emigrant',
+          text: 'Can spare {offerQty} {offerLabel} if you trade me {demandQty} {demandLabel}.',
+        },
+      ],
+    };
+
+    const slots = cfg.slots || defaultSlots;
+    if (!slots[wantedSlotKey]) {
+      return { success: false, reason: 'INVALID_SLOT' };
+    }
+
+    // 1. Spend 1 day / leg and consume daily rations upfront
+    this.turn += 1;
+    const activeParty = this.party.filter((m) => m.health > 0);
+    const foodPerPerson =
+      this.rationTier === 'filling' ? 3 : this.rationTier === 'meager' ? 1.5 : 0.5;
+    const foodNeeded = Math.ceil(activeParty.length * foodPerPerson);
+    const wasStarving = (this.supplies.food || 0) === 0;
+    this.supplies.food = Math.max(0, (this.supplies.food || 0) - foodNeeded);
+
+    if (wasStarving) {
+      for (const m of activeParty) {
+        m.health = Math.max(0, m.health - 8);
+        m.morale = Math.max(0, m.morale - 10);
+      }
+      this.evaluateSurvivalStatus();
+    }
+
+    // 2. Roll for trader availability (25% chance nobody wants to trade)
+    const roll = this.prng.next();
+    if (roll < 0.25) {
+      this.activeTradeOffer = null;
+      const msg = cfg.noTradeText || 'No one willing to trade today.';
+      this.logs.push(`Barter Attempt (Turn ${this.turn}): ${msg}`);
+      return {
+        success: true,
+        foundTrader: false,
+        wantedSlotKey,
+        message: msg,
+      };
+    }
+
+    // 3. Pick a random demanded slot different from wantedSlotKey
+    const candidateKeys = Object.keys(slots).filter((k) => k !== wantedSlotKey);
+    const demandSlotKey = this.prng.pick(candidateKeys);
+    const wantedMeta = slots[wantedSlotKey];
+    const demandMeta = slots[demandSlotKey];
+
+    // 4. Desperation Barter Multiplier (M_desp = 1.75 when player has 0 of wanted item or low traction)
+    const isDesperate =
+      wantedSlotKey === 'traction'
+        ? this.traction <= 30
+        : (this.supplies[wantedSlotKey] || 0) <= 0;
+    const mDesp = isDesperate ? 1.75 : 1.0;
+
+    const offerQty = Math.max(1, wantedMeta.baseQty || 1);
+    const demandQty = Math.max(1, Math.ceil((demandMeta.baseQty || 1) * mDesp));
+
+    const canAfford =
+      demandSlotKey === 'traction'
+        ? this.traction > demandQty + 10
+        : (this.supplies[demandSlotKey] || 0) >= demandQty;
+
+    const arch =
+      Array.isArray(cfg.archetypes) && cfg.archetypes.length > 0
+        ? this.prng.pick(cfg.archetypes)
+        : { speaker: 'Trader', text: 'Trade {offerQty} {offerLabel} for {demandQty} {demandLabel}?' };
+
+    const rawTemplate = arch.template || arch.text || 'Trade {offerQty} {offerLabel} for {demandQty} {demandLabel}?';
+    const dialogue = rawTemplate
+      .replace('{offerQty}', String(offerQty))
+      .replace('{offerLabel}', wantedMeta.label)
+      .replace('{demandQty}', String(demandQty))
+      .replace('{demandLabel}', demandMeta.label);
+
+    const offer = {
+      wantedSlotKey,
+      offerQty,
+      offerLabel: wantedMeta.label,
+      demandSlotKey,
+      demandQty,
+      demandLabel: demandMeta.label,
+      desperate: isDesperate,
+      mDesp,
+      speaker: arch.speaker,
+      dialogue,
+      canAfford,
+    };
+
+    this.activeTradeOffer = offer;
+    return {
+      success: true,
+      foundTrader: true,
+      offer,
+    };
+  }
+
+  /**
+   * Executes an active barter offer (pure goods-for-goods swap, zero cash touched).
+   *
+   * @param {Object} [offer=this.activeTradeOffer]
+   * @returns {{ success: boolean, reason?: string, traded?: Object }}
+   */
+  acceptTradeOffer(offer = this.activeTradeOffer) {
+    if (!offer) {
+      return { success: false, reason: 'NO_ACTIVE_OFFER' };
+    }
+
+    const { wantedSlotKey, offerQty, demandSlotKey, demandQty } = offer;
+
+    // Re-verify player still holds demanded goods
+    if (demandSlotKey === 'traction') {
+      if (this.traction <= demandQty + 10) {
+        return { success: false, reason: 'INSUFFICIENT_GOODS' };
+      }
+      this.traction = Math.max(10, this.traction - demandQty);
+    } else {
+      if ((this.supplies[demandSlotKey] || 0) < demandQty) {
+        return { success: false, reason: 'INSUFFICIENT_GOODS' };
+      }
+      this.supplies[demandSlotKey] -= demandQty;
+    }
+
+    // Grant wanted goods
+    if (wantedSlotKey === 'traction') {
+      this.traction = Math.min(this.maxTraction, this.traction + offerQty);
+    } else {
+      this.supplies[wantedSlotKey] = (this.supplies[wantedSlotKey] || 0) + offerQty;
+    }
+
+    this.activeTradeOffer = null;
+    this.logs.push(
+      `Barter Deal (${offer.speaker}): Swapped ${demandQty} ${offer.demandLabel} for +${offerQty} ${offer.offerLabel}.`
+    );
+
+    return {
+      success: true,
+      traded: offer,
     };
   }
 

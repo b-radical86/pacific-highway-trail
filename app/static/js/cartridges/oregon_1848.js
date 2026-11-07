@@ -73,6 +73,36 @@ export const OREGON_1848_CARTRIDGE = {
     { id: 'partC', label: 'Spare Wagon Tongue', unitCostCents: 1000, bundleSize: 1, unitLabel: 'tongue' },
   ],
 
+  // Barter & Emigrant Trade Configuration
+  barterConfig: {
+    noTradeText: 'Nobody wants to trade with you today. You lost 1 day.',
+    slots: {
+      food: { label: 'lbs of Provisions', baseQty: 40 },
+      ammo: { label: 'rounds of Ammunition', baseQty: 25 },
+      traction: { label: 'Oxen Stamina / Yoke Care', baseQty: 20 },
+      partA: { label: 'Spare Wagon Wheel', baseQty: 1 },
+      partB: { label: 'Spare Wagon Axle', baseQty: 1 },
+      partC: { label: 'Spare Wagon Tongue', baseQty: 1 },
+    },
+    archetypes: [
+      {
+        speaker: 'Traveler from Ohio',
+        template:
+          'A traveler from Ohio offers you {offerQty} {offerLabel} in exchange for {demandQty} {demandLabel}.',
+      },
+      {
+        speaker: 'Stranded Missouri Family',
+        template:
+          'A stranded family from Missouri will trade {offerQty} {offerLabel} if you give them {demandQty} {demandLabel}.',
+      },
+      {
+        speaker: 'Mountain Fur Trapper',
+        template:
+          'A mountain fur trapper offers {offerQty} {offerLabel} for {demandQty} {demandLabel}.',
+      },
+    ],
+  },
+
   // 12 Waypoints across the 2,000 Mile Trail
   waypoints: [
     {

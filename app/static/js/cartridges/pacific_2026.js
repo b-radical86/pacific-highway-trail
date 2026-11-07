@@ -76,6 +76,37 @@ export const PACIFIC_2026_CARTRIDGE = {
     { id: 'partC', label: 'Gastro-Stop & Panadol Blister Pack', unitCostCents: 1200, bundleSize: 1, unitLabel: 'pack' },
   ],
 
+  // Barter & Rest-Stop Swap Configuration
+  barterConfig: {
+    noTradeText:
+      'Every caravaner in the rest area had their head down eating lukewarm pies. Nobody wanted to swap. Lost 1 leg (30 mins).',
+    slots: {
+      food: { label: 'Car Snack Packets', baseQty: 12 },
+      ammo: { label: 'Hot Chips & 50¢ Coins', baseQty: 10 },
+      traction: { label: 'Jerrycan Fuel & Espresso Boost', baseQty: 20 },
+      partA: { label: 'Emergency Nappy & Wet-Wipe Kit', baseQty: 1 },
+      partB: { label: '12V USB-C Fast Charger', baseQty: 1 },
+      partC: { label: 'Gastro-Stop & Panadol Pack', baseQty: 1 },
+    },
+    archetypes: [
+      {
+        speaker: 'Gary & Cheryl (28ft Jayco Caravan)',
+        template:
+          "G'day mate, saw you looking stressed near the picnic tables. I'll swap you {offerQty} {offerLabel} if you've got {demandQty} {demandLabel} for Cheryl.",
+      },
+      {
+        speaker: 'Frazzled Kia Carnival Mum',
+        template:
+          'Look, I am desperate. I will trade you {offerQty} {offerLabel} right now on the bonnet of my car for {demandQty} {demandLabel}.',
+      },
+      {
+        speaker: 'Wayne (Hi-Vis Tradie at Driver Reviver)',
+        template:
+          "Mate, servo's fleecing everyone inside. Flick us {demandQty} {demandLabel} and you can take {offerQty} {offerLabel} off the back of the ute.",
+      },
+    ],
+  },
+
   // 10 Waypoints from Sydney Harbour to Brisbane River
   waypoints: [
     {
