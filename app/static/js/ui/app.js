@@ -383,27 +383,34 @@ export function createTrailApp() {
         return;
       }
 
-      const curWp = this._engine.getCurrentWaypoint();
-      const nextWp = this._engine.getNextWaypoint();
-      const isCommercial = Boolean(
-        (curWp && (curWp.servoStop || curWp.tradingPost)) ||
-          (nextWp && (nextWp.servoStop || nextWp.tradingPost))
-      );
-      const result = this._engine.executeRest(isCommercial);
+      this.isTraveling = true;
+      sound.playBeep(420, 'sine', 0.2);
 
-      if (!result.success && result.reason === 'STARVATION') {
-        sound.playStinkBuzzer();
-      } else {
-        sound.playBeep(520, 'sine', 0.25);
-      }
+      // Trigger 24-hour day/night cycle rest animation
+      this._canvasEngine.startRestAnimation(1400, () => {
+        const curWp = this._engine.getCurrentWaypoint();
+        const nextWp = this._engine.getNextWaypoint();
+        const isCommercial = Boolean(
+          (curWp && (curWp.servoStop || curWp.tradingPost)) ||
+            (nextWp && (nextWp.servoStop || nextWp.tradingPost))
+        );
+        const result = this._engine.executeRest(isCommercial);
 
-      this.syncSnapshot();
-      this.autoSave();
+        if (!result.success && result.reason === 'STARVATION') {
+          sound.playStinkBuzzer();
+        } else {
+          sound.playBeep(520, 'sine', 0.25);
+        }
 
-      if (this.ui.status === 'DIED' || this.ui.status === 'U_TURN') {
-        sound.playStinkBuzzer();
-        this.modalType = 'GAMEOVER';
-      }
+        this.isTraveling = false;
+        this.syncSnapshot();
+        this.autoSave();
+
+        if (this.ui.status === 'DIED' || this.ui.status === 'U_TURN') {
+          sound.playStinkBuzzer();
+          this.modalType = 'GAMEOVER';
+        }
+      });
     },
 
     cyclePace() {
@@ -553,6 +560,9 @@ export function createTrailApp() {
       const hunt = new HuntScene({
         cartridgeId: this.cartridgeId,
         ammo: this._engine.supplies.ammo,
+        difficultyMultiplier: this._engine.difficultyMultiplier || 1.0,
+        distance: this._engine.distance,
+        totalDistance: this._engine.totalDistance,
         onComplete: (result) => {
           this._canvasEngine.activeScene = null;
           this.miniGameActive = false;

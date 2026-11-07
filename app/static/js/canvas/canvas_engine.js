@@ -159,6 +159,7 @@ export class CanvasEngine {
     const endTod = endMap[targetDayPhase] ?? 0.92;
     this.timeOfDay = startTod;
     this.isMoving = true;
+    this.isResting = false;
 
     this.travelTween = {
       startTod,
@@ -166,6 +167,33 @@ export class CanvasEngine {
       elapsedMs: 0,
       durationMs: Math.max(100, durationMs),
       onComplete,
+    };
+  }
+
+  /**
+   * Starts a camp & rest visual animation simulating a full 24-hour cycle.
+   * Sky progresses through Dusk -> Night (Campfire / Rest stop lighting) -> Dawn.
+   *
+   * @param {number} [durationMs=1400]
+   * @param {Function} [onComplete]
+   */
+  startRestAnimation(durationMs = 1400, onComplete = null) {
+    this.isMoving = false;
+    this.isResting = true;
+    const startTod = 0.35; // Start in afternoon
+    const endTod = 1.15; // Sweep past night (0.95) into next dawn (1.15 -> wrapped to 0.15)
+
+    this.travelTween = {
+      startTod,
+      endTod,
+      elapsedMs: 0,
+      durationMs: Math.max(100, durationMs),
+      isRest: true,
+      onComplete: () => {
+        this.timeOfDay = 0.15; // Wake at morning
+        this.isResting = false;
+        if (typeof onComplete === 'function') onComplete();
+      },
     };
   }
 
@@ -247,7 +275,8 @@ export class CanvasEngine {
     if (this.travelTween) {
       this.travelTween.elapsedMs += dt * 1000;
       const t = Math.min(1, this.travelTween.elapsedMs / this.travelTween.durationMs);
-      this.timeOfDay = this.travelTween.startTod + (this.travelTween.endTod - this.travelTween.startTod) * t;
+      const rawTod = this.travelTween.startTod + (this.travelTween.endTod - this.travelTween.startTod) * t;
+      this.timeOfDay = rawTod > 1.0 ? rawTod - 1.0 : rawTod;
       if (t >= 1) {
         const doneCb = this.travelTween.onComplete;
         this.travelTween = null;
@@ -312,19 +341,101 @@ export class CanvasEngine {
     // 3. Roadside Memorials / Past Run Tombstones
     this._renderMemorials(ctx);
 
-    // 4. Hero Vehicle
+    // 4. Hero Vehicle & Campsite Overlay
     if (this.cartridgeId === 'oregon_1848') {
       drawSchooner(ctx, 250, 240, this.animTime, this.isMoving);
+      if (this.isResting) {
+        this._renderCampsite1848(ctx, 210, 254);
+      }
     } else {
       drawSUV(ctx, 280, 242, this.animTime, this.isMoving, {
         ...this.vfxFlags,
         timeOfDay: this.timeOfDay,
         isNight: bucket === 'NIGHT',
       });
+      if (this.isResting) {
+        this._renderCampsite2026(ctx, 235, 256);
+      }
     }
 
     // 5. Weather Particle Overlay
     this._renderWeatherOverlay(ctx);
+  }
+
+  _renderCampsite1848(ctx, fireX, fireY) {
+    ctx.save();
+    // Campfire wood base
+    ctx.fillStyle = '#451a03';
+    ctx.fillRect(fireX - 12, fireY + 4, 24, 4);
+    ctx.fillRect(fireX - 8, fireY + 1, 16, 4);
+
+    // Warm glow on ground
+    const glow = ctx.createRadialGradient(fireX, fireY, 3, fireX, fireY, 35);
+    glow.addColorStop(0, 'rgba(249, 115, 22, 0.45)');
+    glow.addColorStop(1, 'rgba(249, 115, 22, 0.0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(fireX, fireY, 35, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Flickering flame tongues
+    const flicker = Math.sin(this.animTime * 18) * 3;
+    const flameH = 14 + flicker;
+    ctx.fillStyle = '#f97316';
+    ctx.beginPath();
+    ctx.moveTo(fireX - 8, fireY + 4);
+    ctx.quadraticCurveTo(fireX - 4, fireY - flameH * 0.6, fireX, fireY - flameH);
+    ctx.quadraticCurveTo(fireX + 4, fireY - flameH * 0.6, fireX + 8, fireY + 4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Inner bright yellow flame
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.moveTo(fireX - 4, fireY + 4);
+    ctx.quadraticCurveTo(fireX - 2, fireY - flameH * 0.4, fireX, fireY - flameH * 0.65);
+    ctx.quadraticCurveTo(fireX + 2, fireY - flameH * 0.4, fireX + 4, fireY + 4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Embers rising
+    ctx.fillStyle = '#fed7aa';
+    for (let i = 0; i < 4; i++) {
+      const emberY = fireY - 10 - ((this.animTime * 45 + i * 15) % 30);
+      const emberX = fireX + Math.sin(this.animTime * 8 + i * 2) * 6;
+      ctx.fillRect(emberX, emberY, 2, 2);
+    }
+    ctx.restore();
+  }
+
+  _renderCampsite2026(ctx, campX, campY) {
+    ctx.save();
+    // Fold-out camping chairs & esky
+    ctx.fillStyle = '#1e3a8a'; // Blue camping chair
+    ctx.fillRect(campX - 16, campY - 8, 12, 16);
+    ctx.fillStyle = '#dc2626'; // Red Esky (cooler)
+    ctx.fillRect(campX + 4, campY - 2, 14, 10);
+    ctx.fillStyle = '#f8fafc'; // White lid
+    ctx.fillRect(campX + 3, campY - 4, 16, 3);
+
+    // Warm lantern / camp light
+    const lanternX = campX - 2;
+    const lanternY = campY - 14;
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(lanternX - 3, lanternY - 2, 6, 8);
+    const lanternGlow = ctx.createRadialGradient(lanternX, lanternY, 2, lanternX, lanternY, 30);
+    lanternGlow.addColorStop(0, 'rgba(254, 240, 138, 0.45)');
+    lanternGlow.addColorStop(1, 'rgba(254, 240, 138, 0.0)');
+    ctx.fillStyle = lanternGlow;
+    ctx.beginPath();
+    ctx.arc(lanternX, lanternY, 30, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Text banner: CAMP & REST
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 9px monospace';
+    ctx.fillText('REST STOP', campX - 24, campY - 24);
+    ctx.restore();
   }
 
   _renderMemorials(ctx) {

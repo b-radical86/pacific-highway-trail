@@ -445,6 +445,31 @@ if (barterEngine.cashCents !== 4200) {
   throw new Error('Guide barter must not deduct cashCents');
 }
 
+// 15. HuntScene: Difficulty scaling, Biomes, and Barren spots
+const easyHunt = new HuntScene({
+  cartridgeId: 'oregon_1848',
+  ammo: 20,
+  difficultyMultiplier: 1.0,
+  distance: 200,
+  totalDistance: 2000
+});
+if (easyHunt.biome !== 'PLAINS' || easyHunt.maxTimer !== 28.0) {
+  throw new Error('Easy hunt configuration mismatch: ' + JSON.stringify(easyHunt));
+}
+const hardHunt = new HuntScene({
+  cartridgeId: 'oregon_1848',
+  ammo: 20,
+  difficultyMultiplier: 3.0,
+  distance: 1000,
+  totalDistance: 2000
+});
+if (hardHunt.biome !== 'WOODS' || hardHunt.maxTimer !== 16.0) {
+  throw new Error('Hard hunt woods configuration mismatch: ' + JSON.stringify(hardHunt));
+}
+if (hardHunt.speedFactor !== 1.45 || hardHunt.maxTargetDensity > 2) {
+  throw new Error('Hard hunt target pacing not properly capped: ' + hardHunt.speedFactor);
+}
+
 console.log('NODE_ESM_ASSERTIONS_PASSED');
 """
     result = subprocess.run(

@@ -15,16 +15,58 @@ export class HuntScene {
    * @param {Object} options Configuration
    * @param {'oregon_1848'|'pacific_2026'} options.cartridgeId
    * @param {number} [options.ammo=20] Initial ammo/coins
+   * @param {number} [options.difficultyMultiplier=1.0] Difficulty scaling (1.0 = Easy, 2.0 = Med, 3.0 = Hard)
+   * @param {number} [options.distance=0] Current travel distance
+   * @param {number} [options.totalDistance=2000] Total route distance
    * @param {Function} [options.onComplete] Callback with { foodYield, ammoSpent, sanityGained }
    */
   constructor(options = {}) {
     this.cartridgeId = options.cartridgeId || 'pacific_2026';
     this.initialAmmo = options.ammo ?? 20;
     this.ammo = this.initialAmmo;
+    this.difficultyMultiplier = options.difficultyMultiplier || 1.0;
+    this.distance = options.distance || 0;
+    this.totalDistance = options.totalDistance || (this.cartridgeId === 'pacific_2026' ? 920 : 2000);
     this.onComplete = options.onComplete || (() => {});
 
-    this.timer = 30.0;
-    this.maxTimer = 30.0;
+    // Difficulty scaling:
+    // Easy (1.0x): 28s timer, speed factor 0.85, hit radius bonus +6px
+    // Medium (2.0x): 22s timer, speed factor 1.15, hit radius 0px
+    // Hard (3.0x): 16s timer, speed factor 1.45, hit radius penalty -4px
+    if (this.difficultyMultiplier >= 2.8) {
+      this.maxTimer = 16.0;
+      this.speedFactor = 1.45;
+      this.hitRadiusOffset = -4;
+      this.maxTargetDensity = this.cartridgeId === 'pacific_2026' ? 3 : 2;
+    } else if (this.difficultyMultiplier >= 1.8) {
+      this.maxTimer = 22.0;
+      this.speedFactor = 1.15;
+      this.hitRadiusOffset = 0;
+      this.maxTargetDensity = this.cartridgeId === 'pacific_2026' ? 4 : 3;
+    } else {
+      this.maxTimer = 28.0;
+      this.speedFactor = 0.85;
+      this.hitRadiusOffset = 6;
+      this.maxTargetDensity = this.cartridgeId === 'pacific_2026' ? 5 : 4;
+    }
+    this.timer = this.maxTimer;
+
+    // Biome Resolution:
+    // 1848: PLAINS (0 - 640 mi), MOUNTAINS_WOODS (640 - 1534 mi), DESERT_CRAGS (1534 - 2000 mi)
+    // 2026: HIGHWAY_RURAL (0 - 315 km), COASTAL_WOODS (315 - 740 km), SUBURBAN_BORDER (740 - 920 km)
+    const distRatio = Math.max(0, Math.min(1, this.distance / this.totalDistance));
+    if (distRatio < 0.35) {
+      this.biome = 'PLAINS';
+    } else if (distRatio < 0.78) {
+      this.biome = 'WOODS';
+    } else {
+      this.biome = 'CRAGS';
+    }
+
+    // Barren spot roll: 20% to 35% chance depending on difficulty
+    const barrenChance = Math.min(0.35, 0.18 + (this.difficultyMultiplier - 1.0) * 0.08);
+    this.isBarren = Math.random() < barrenChance;
+
     this.isActive = true;
     this.ammoSpent = 0;
     this.foodHarvested = 0;
@@ -48,122 +90,281 @@ export class HuntScene {
 
     // Spawn initial target entities
     this.entities = [];
-    this._spawnInitialEntities();
+    if (!this.isBarren) {
+      this._spawnInitialEntities();
+    } else {
+      // Auto-exit after 4.5 seconds if barren
+      this.timer = Math.min(this.timer, 5.0);
+    }
   }
 
   _spawnInitialEntities() {
-    const count = this.cartridgeId === 'pacific_2026' ? 8 : 6;
+    const count = Math.min(this.maxTargetDensity, this.cartridgeId === 'pacific_2026' ? 3 : 2);
     for (let i = 0; i < count; i++) {
       this._spawnEntity(true);
     }
   }
 
   _spawnEntity(randomX = false) {
+    if (this.isBarren || this.entities.length >= this.maxTargetDensity) return;
+
     const fromLeft = Math.random() > 0.5;
     const x = randomX ? 80 + Math.random() * 640 : fromLeft ? -50 : 850;
     const y = 90 + Math.random() * 210;
     const phase = Math.random() * Math.PI * 2;
+    const spd = this.speedFactor;
 
     if (this.cartridgeId === 'oregon_1848') {
       const roll = Math.random();
-      if (roll < 0.35) {
-        // Bison (slow, heavy food yield)
-        this.entities.push({
-          type: 'BISON',
-          x,
-          y: 200 + Math.random() * 90,
-          vx: (fromLeft ? 1 : -1) * (26 + Math.random() * 22),
-          r: 30,
-          phase,
-          yieldFood: 200,
-          label: 'Bison (200 lbs)',
-          color: '#38220f',
-        });
-      } else if (roll < 0.72) {
-        // Deer (medium speed, agile)
-        this.entities.push({
-          type: 'DEER',
-          x,
-          y: 180 + Math.random() * 110,
-          vx: (fromLeft ? 1 : -1) * (52 + Math.random() * 38),
-          r: 24,
-          phase,
-          yieldFood: 100,
-          label: 'Deer (100 lbs)',
-          color: '#a0522d',
-        });
+
+      if (this.biome === 'PLAINS') {
+        // High Bison presence (50%), Rabbits (35%), Deer (15%)
+        if (roll < 0.50) {
+          this.entities.push({
+            type: 'BISON',
+            x,
+            y: 200 + Math.random() * 90,
+            vx: (fromLeft ? 1 : -1) * (24 + Math.random() * 18) * spd,
+            r: 30,
+            phase,
+            yieldFood: 200,
+            label: 'Plains Bison (200 lbs)',
+            color: '#38220f',
+          });
+        } else if (roll < 0.85) {
+          this.entities.push({
+            type: 'RABBIT',
+            x,
+            y: 240 + Math.random() * 80,
+            vx: (fromLeft ? 1 : -1) * (90 + Math.random() * 45) * spd,
+            r: 18,
+            phase,
+            yieldFood: 15,
+            label: 'Prairie Hare (15 lbs)',
+            color: '#d6d3d1',
+          });
+        } else {
+          this.entities.push({
+            type: 'DEER',
+            x,
+            y: 180 + Math.random() * 110,
+            vx: (fromLeft ? 1 : -1) * (54 + Math.random() * 32) * spd,
+            r: 24,
+            phase,
+            yieldFood: 100,
+            label: 'White-tailed Deer (100 lbs)',
+            color: '#a0522d',
+          });
+        }
+      } else if (this.biome === 'WOODS') {
+        // High Moose & Deer presence in mountain timber (Moose 40%, Deer 40%, Rabbit 20%)
+        if (roll < 0.40) {
+          this.entities.push({
+            type: 'MOOSE',
+            x,
+            y: 190 + Math.random() * 100,
+            vx: (fromLeft ? 1 : -1) * (20 + Math.random() * 14) * spd,
+            r: 34,
+            phase,
+            yieldFood: 300,
+            label: 'Bull Moose (300 lbs)',
+            color: '#291d14',
+          });
+        } else if (roll < 0.80) {
+          this.entities.push({
+            type: 'DEER',
+            x,
+            y: 180 + Math.random() * 110,
+            vx: (fromLeft ? 1 : -1) * (58 + Math.random() * 35) * spd,
+            r: 24,
+            phase,
+            yieldFood: 100,
+            label: 'Mule Deer (100 lbs)',
+            color: '#a0522d',
+          });
+        } else {
+          this.entities.push({
+            type: 'RABBIT',
+            x,
+            y: 240 + Math.random() * 80,
+            vx: (fromLeft ? 1 : -1) * (95 + Math.random() * 45) * spd,
+            r: 18,
+            phase,
+            yieldFood: 15,
+            label: 'Forest Rabbit (15 lbs)',
+            color: '#a8a29e',
+          });
+        }
       } else {
-        // Rabbit (fast, low food)
-        this.entities.push({
-          type: 'RABBIT',
-          x,
-          y: 240 + Math.random() * 80,
-          vx: (fromLeft ? 1 : -1) * (90 + Math.random() * 50),
-          r: 18,
-          phase,
-          yieldFood: 15,
-          label: 'Rabbit (15 lbs)',
-          color: '#d6d3d1',
-        });
+        // High Desert & Canyon Crags: Fast fleet deer (45%), Bounding Jackrabbits (55%)
+        if (roll < 0.45) {
+          this.entities.push({
+            type: 'DEER',
+            x,
+            y: 180 + Math.random() * 110,
+            vx: (fromLeft ? 1 : -1) * (65 + Math.random() * 40) * spd,
+            r: 24,
+            phase,
+            yieldFood: 100,
+            label: 'Mountain Bighorn (100 lbs)',
+            color: '#78350f',
+          });
+        } else {
+          this.entities.push({
+            type: 'RABBIT',
+            x,
+            y: 240 + Math.random() * 80,
+            vx: (fromLeft ? 1 : -1) * (110 + Math.random() * 55) * spd,
+            r: 18,
+            phase,
+            yieldFood: 15,
+            label: 'Desert Jackrabbit (15 lbs)',
+            color: '#d6d3d1',
+          });
+        }
       }
     } else {
+      // 2026 Cartridge Rest-Stop Defence
       const roll = Math.random();
-      if (roll < 0.42) {
-        // Australian White Ibis ("Bin Chicken") — Swooping pest
-        this.entities.push({
-          type: 'IBIS',
-          x,
-          y,
-          vx: (fromLeft ? 1 : -1) * (60 + Math.random() * 45),
-          baseY: y,
-          r: 26,
-          phase,
-          isThreat: true,
-          label: 'Bin Chicken',
-          color: '#f8fafc',
-        });
-      } else if (roll < 0.72) {
-        // Silver Seagull — Fast darting thief
-        this.entities.push({
-          type: 'SEAGULL',
-          x,
-          y,
-          vx: (fromLeft ? 1 : -1) * (85 + Math.random() * 55),
-          baseY: y,
-          r: 22,
-          phase,
-          isThreat: true,
-          label: 'Seagull',
-          color: '#e2e8f0',
-        });
-      } else if (roll < 0.88) {
-        // Flat White Takeaway Coffee — High value sanity pickup
-        this.entities.push({
-          type: 'COFFEE',
-          x,
-          y: 110 + Math.random() * 160,
-          vx: (fromLeft ? 1 : -1) * 32,
-          baseY: y,
-          r: 22,
-          phase,
-          yieldSanity: 15,
-          label: 'Flat White (+15 Sanity)',
-          color: '#b45309',
-        });
+      if (this.biome === 'PLAINS') {
+        // Coastal / River Flatlands: Seagulls (45%), Bin Chickens (30%), Sausage Roll (15%), Coffee (10%)
+        if (roll < 0.45) {
+          this.entities.push({
+            type: 'SEAGULL',
+            x,
+            y,
+            vx: (fromLeft ? 1 : -1) * (85 + Math.random() * 55) * spd,
+            baseY: y,
+            r: 22,
+            phase,
+            isThreat: true,
+            label: 'Silver Gull',
+            color: '#e2e8f0',
+          });
+        } else if (roll < 0.75) {
+          this.entities.push({
+            type: 'IBIS',
+            x,
+            y,
+            vx: (fromLeft ? 1 : -1) * (60 + Math.random() * 45) * spd,
+            baseY: y,
+            r: 26,
+            phase,
+            isThreat: true,
+            label: 'Bin Chicken',
+            color: '#f8fafc',
+          });
+        } else if (roll < 0.90) {
+          this.entities.push({
+            type: 'SNACK',
+            x,
+            y: 120 + Math.random() * 150,
+            vx: (fromLeft ? 1 : -1) * 36 * spd,
+            baseY: y,
+            r: 24,
+            phase,
+            yieldFood: 8,
+            label: 'Sausage Roll (+8)',
+            color: '#d97706',
+          });
+        } else {
+          this.entities.push({
+            type: 'COFFEE',
+            x,
+            y: 110 + Math.random() * 160,
+            vx: (fromLeft ? 1 : -1) * 32 * spd,
+            baseY: y,
+            r: 22,
+            phase,
+            yieldSanity: 15,
+            label: 'Flat White (+15 Sanity)',
+            color: '#b45309',
+          });
+        }
+      } else if (this.biome === 'WOODS') {
+        // Mountain Highway Rest Stop: Aggressive Bin Chickens raiding picnic bins (55%), Coffee (25%), Snacks (20%)
+        if (roll < 0.55) {
+          this.entities.push({
+            type: 'IBIS',
+            x,
+            y,
+            vx: (fromLeft ? 1 : -1) * (68 + Math.random() * 48) * spd,
+            baseY: y,
+            r: 26,
+            phase,
+            isThreat: true,
+            label: 'Raid Leader Ibis',
+            color: '#f8fafc',
+          });
+        } else if (roll < 0.80) {
+          this.entities.push({
+            type: 'COFFEE',
+            x,
+            y: 110 + Math.random() * 160,
+            vx: (fromLeft ? 1 : -1) * 34 * spd,
+            baseY: y,
+            r: 22,
+            phase,
+            yieldSanity: 15,
+            label: 'Barista Espresso (+15 Sanity)',
+            color: '#b45309',
+          });
+        } else {
+          this.entities.push({
+            type: 'SNACK',
+            x,
+            y: 120 + Math.random() * 150,
+            vx: (fromLeft ? 1 : -1) * 38 * spd,
+            baseY: y,
+            r: 24,
+            phase,
+            yieldFood: 8,
+            label: 'Meat Pie (+8 Food)',
+            color: '#d97706',
+          });
+        }
       } else {
-        // Bakery Sausage Roll / Hot Meat Pie — Food snack pickup
-        this.entities.push({
-          type: 'SNACK',
-          x,
-          y: 120 + Math.random() * 150,
-          vx: (fromLeft ? 1 : -1) * 36,
-          baseY: y,
-          r: 24,
-          phase,
-          yieldFood: 8,
-          label: 'Sausage Roll (+8)',
-          color: '#d97706',
-        });
+        // Border Gauntlet: Fast diving seagulls & crows (65%), Quick takeaway coffee (20%), Snacks (15%)
+        if (roll < 0.65) {
+          this.entities.push({
+            type: 'SEAGULL',
+            x,
+            y,
+            vx: (fromLeft ? 1 : -1) * (95 + Math.random() * 60) * spd,
+            baseY: y,
+            r: 22,
+            phase,
+            isThreat: true,
+            label: 'Border Gull',
+            color: '#e2e8f0',
+          });
+        } else if (roll < 0.85) {
+          this.entities.push({
+            type: 'COFFEE',
+            x,
+            y: 110 + Math.random() * 160,
+            vx: (fromLeft ? 1 : -1) * 35 * spd,
+            baseY: y,
+            r: 22,
+            phase,
+            yieldSanity: 15,
+            label: 'Iced Coffee (+15 Sanity)',
+            color: '#b45309',
+          });
+        } else {
+          this.entities.push({
+            type: 'SNACK',
+            x,
+            y: 120 + Math.random() * 150,
+            vx: (fromLeft ? 1 : -1) * 40 * spd,
+            baseY: y,
+            r: 24,
+            phase,
+            yieldFood: 8,
+            label: 'Roadhouse Roll (+8)',
+            color: '#d97706',
+          });
+        }
       }
     }
   }
@@ -235,20 +436,27 @@ export class HuntScene {
     // Impact muzzle flash / hit ring
     this.shotFlashes.push({ x: vx, y: vy, life: 0.22, r: 18 });
 
-    const minHitRadius = 24;
+    const minHitRadius = Math.max(16, 24 + (this.hitRadiusOffset || 0));
     let hitSomething = false;
     let hitTarget = null;
 
     for (let i = this.entities.length - 1; i >= 0; i--) {
       const ent = this.entities[i];
       const dist = Math.hypot(vx - ent.x, vy - ent.y);
-      const effectiveRadius = Math.max(minHitRadius, ent.r + 4);
+      const effectiveRadius = Math.max(minHitRadius, ent.r + (this.hitRadiusOffset || 0));
 
       if (dist <= effectiveRadius) {
         hitSomething = true;
         hitTarget = ent;
         this.entities.splice(i, 1);
         break;
+      }
+    }
+
+    // Startle remaining targets on nearby gunshots/shooing in higher difficulty
+    if (this.difficultyMultiplier >= 2.0) {
+      for (const other of this.entities) {
+        other.vx *= 1.35; // Flee faster
       }
     }
 
@@ -406,18 +614,20 @@ export class HuntScene {
       }
     }
 
-    // Maintain lively target density
-    while (this.entities.length < (this.cartridgeId === 'pacific_2026' ? 8 : 6)) {
-      this._spawnEntity(false);
+    // Maintain difficulty-tuned target density (if not barren)
+    if (!this.isBarren) {
+      while (this.entities.length < this.maxTargetDensity) {
+        this._spawnEntity(false);
+      }
     }
 
     // Update target hover lock detection
     this.hoverTarget = null;
-    const minHitRadius = 24;
+    const minHitRadius = Math.max(16, 24 + (this.hitRadiusOffset || 0));
     for (let i = this.entities.length - 1; i >= 0; i--) {
       const ent = this.entities[i];
       const dist = Math.hypot(this.crosshairX - ent.x, this.crosshairY - ent.y);
-      if (dist <= Math.max(minHitRadius, ent.r + 4)) {
+      if (dist <= Math.max(minHitRadius, ent.r + (this.hitRadiusOffset || 0))) {
         this.hoverTarget = ent;
         break;
       }
@@ -756,6 +966,8 @@ export class HuntScene {
       this._drawSnack(ctx, ent);
     } else if (ent.type === 'BISON') {
       this._drawBison(ctx, ent);
+    } else if (ent.type === 'MOOSE') {
+      this._drawMoose(ctx, ent);
     } else if (ent.type === 'DEER') {
       this._drawDeer(ctx, ent);
     } else if (ent.type === 'RABBIT') {
@@ -1011,6 +1223,60 @@ export class HuntScene {
     ctx.fillRect(-6, 16, 5, 10);
     ctx.fillRect(8, 16, 5, 10);
     ctx.fillRect(16, 16, 5, 10);
+  }
+
+  _drawMoose(ctx, ent) {
+    // Massive dark brown timber body
+    ctx.fillStyle = '#1c120c';
+    ctx.beginPath();
+    ctx.ellipse(-8, 4, 32, 22, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // High shoulder hump
+    ctx.beginPath();
+    ctx.arc(4, -8, 20, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Thick snout & head
+    ctx.fillStyle = '#26170d';
+    ctx.beginPath();
+    ctx.arc(24, -2, 14, 0, Math.PI * 2);
+    ctx.fill();
+    // Dewlap / bell under neck
+    ctx.beginPath();
+    ctx.moveTo(16, 8);
+    ctx.lineTo(20, 20);
+    ctx.lineTo(24, 8);
+    ctx.fill();
+
+    // Broad palmate antlers
+    ctx.fillStyle = '#d4b996';
+    ctx.strokeStyle = '#8c6d46';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(18, -14);
+    ctx.quadraticCurveTo(8, -32, 2, -30);
+    ctx.lineTo(-4, -22);
+    ctx.lineTo(8, -18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(22, -14);
+    ctx.quadraticCurveTo(28, -35, 34, -32);
+    ctx.lineTo(32, -22);
+    ctx.lineTo(24, -18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Sturdy long legs
+    ctx.fillStyle = '#120a06';
+    ctx.fillRect(-22, 18, 6, 16);
+    ctx.fillRect(-8, 18, 6, 16);
+    ctx.fillRect(6, 18, 6, 16);
+    ctx.fillRect(18, 18, 6, 16);
   }
 
   _drawDeer(ctx, ent) {
@@ -1298,6 +1564,38 @@ export class HuntScene {
       ctx.fillStyle = '#38bdf8';
       ctx.font = 'bold 10px monospace';
       ctx.fillText(`+${this.sanityGained} Sanity`, 690, 38);
+    }
+
+    // Barren Alert Overlay Banner
+    if (this.isBarren) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+      ctx.fillRect(150, 160, width - 300, 80);
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(150, 160, width - 300, 80);
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = 'bold 13px monospace';
+      ctx.textAlign = 'center';
+      const barrenTitle =
+        this.cartridgeId === 'pacific_2026'
+          ? 'REST STOP DESERTED'
+          : 'BARREN WILDERNESS';
+      ctx.fillText(barrenTitle, width / 2, 190);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '11px monospace';
+      const barrenMsg =
+        this.cartridgeId === 'pacific_2026'
+          ? 'No food trucks, cafe, or birds here. Journey must continue!'
+          : 'No animal tracks found in this region. You must move on!';
+      ctx.fillText(barrenMsg, width / 2, 212);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '9px monospace';
+      ctx.fillText(`Returning to trail in ${this.timer.toFixed(1)}s [Esc to exit]`, width / 2, 230);
+      ctx.restore();
     }
   }
 }
