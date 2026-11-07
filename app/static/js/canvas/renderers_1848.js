@@ -1,67 +1,125 @@
 /**
  * Procedural 2D Vector Renderers for Cartridge 1: 1848 Oregon Trail.
  * Pure Canvas 2D API calls — zero external image assets.
+ *
+ * Implements:
+ * - Dynamic Silhouette Layers with Aerial Perspective (0.1x Far, 0.4x Mid, 1.0x Near)
+ * - High Sierra / Blue Mountain 2px Snow Accumulation on Tree Tops & Wagon Canopy
+ * - Ground Contact Drop Shadows & 3-5 Rotating, Fading Wheel Dust Puffs
  */
 
 /**
- * Renders 3-layer parallax terrain for the 1848 Oregon Trail.
+ * Renders 3-layer aerial-perspective parallax terrain for the 1848 Oregon Trail.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} scrollX Cumulative scroll offset
  * @param {number} width Virtual width (800)
  * @param {number} height Virtual height (400)
+ * @param {Object} [env={}] { skyBucket, isSnowing }
  */
-export function drawBackground1848(ctx, scrollX, width = 800, height = 400) {
+export function drawBackground1848(ctx, scrollX, width = 800, height = 400, env = {}) {
   const horizonY = 240;
+  const bucket = env.skyBucket || 'MIDDAY';
+  const isSnowing = Boolean(env.isSnowing);
 
-  // 1. Parallax Layer 1: Distant Jagged Rocky Mountains (0.2x speed)
-  const mOffset = (scrollX * 0.2) % 400;
-  ctx.fillStyle = '#2c3e50';
+  // 1. Far Layer (0.1x speed): Low contrast, high tint toward horizon sky tone (Mount Hood / Wind River Range)
+  const farOffset = (scrollX * 0.1) % 400;
+  const farPalette = {
+    DAWN: '#9b7ca6',     // Pale lavender-rose
+    MIDDAY: '#7fb3d5',   // Hazy frontier sky-blue
+    SUNSET: '#8e6b8e',   // Dusty violet-lavender
+    NIGHT: '#24334a',    // Muted midnight slate
+  };
+  ctx.fillStyle = farPalette[bucket] || '#7fb3d5';
   ctx.beginPath();
-  ctx.moveTo(-mOffset, horizonY);
-  for (let x = -mOffset; x < width + 400; x += 100) {
-    const peakH = 75 + ((Math.abs(Math.floor(x / 100)) * 37) % 45);
+  ctx.moveTo(-farOffset, horizonY);
+  for (let x = -farOffset; x < width + 400; x += 100) {
+    const peakH = 82 + ((Math.abs(Math.floor(x / 100)) * 37) % 45);
     ctx.lineTo(x + 50, horizonY - peakH);
     ctx.lineTo(x + 100, horizonY);
   }
   ctx.closePath();
   ctx.fill();
 
-  // Snow caps on tall peaks
-  ctx.fillStyle = 'rgba(236, 240, 241, 0.35)';
-  for (let x = -mOffset; x < width + 400; x += 200) {
-    const peakY = horizonY - 95;
+  // Snow caps on far peaks
+  ctx.fillStyle = bucket === 'NIGHT' ? 'rgba(203, 213, 225, 0.22)' : 'rgba(248, 250, 252, 0.42)';
+  for (let x = -farOffset; x < width + 400; x += 200) {
+    const peakY = horizonY - 98;
     ctx.beginPath();
     ctx.moveTo(x + 50, peakY);
-    ctx.lineTo(x + 36, peakY + 22);
-    ctx.lineTo(x + 64, peakY + 22);
+    ctx.lineTo(x + 35, peakY + 24);
+    ctx.lineTo(x + 65, peakY + 24);
     ctx.closePath();
     ctx.fill();
   }
 
-  // 2. Parallax Layer 2: Midground Pine Forests & Western Buttes (0.5x speed)
-  const tOffset = (scrollX * 0.5) % 160;
-  ctx.fillStyle = '#196f3d';
-  for (let x = -tOffset; x < width + 160; x += 40) {
+  // 2. Mid Layer (0.4x speed): Darker tones with crisp geometric peaks & rolling foothills
+  const midOffset = (scrollX * 0.4) % 240;
+  const midPalette = {
+    DAWN: '#4a354f',
+    MIDDAY: '#2c3e50',
+    SUNSET: '#4a2c40',
+    NIGHT: '#16202e',
+  };
+  ctx.fillStyle = midPalette[bucket] || '#2c3e50';
+  ctx.beginPath();
+  ctx.moveTo(-midOffset, horizonY);
+  for (let x = -midOffset; x < width + 240; x += 80) {
+    const ridgeH = 38 + ((Math.abs(Math.floor(x / 80)) * 23) % 28);
+    ctx.lineTo(x + 28, horizonY - ridgeH);
+    ctx.lineTo(x + 54, horizonY - ridgeH * 0.72);
+    ctx.lineTo(x + 80, horizonY);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // 3. Near Layer (1.0x speed): High contrast, saturated foreground silhouettes (pine trees, fence lines, trail)
+  ctx.fillStyle = '#6e5a11';
+  ctx.fillRect(0, horizonY, width, height - horizonY);
+
+  // Foreground Pine Trees & Split-Rail Fence Lines (1.0x speed)
+  const nearOffset = (scrollX * 1.0) % 160;
+  for (let x = -nearOffset; x < width + 160; x += 40) {
     const treeH = 28 + ((Math.abs(Math.floor(x / 40)) * 19) % 16);
+    const apexX = x + 12;
+    const apexY = horizonY + 4 - treeH;
+
+    // Saturated foreground pine silhouette
+    ctx.fillStyle = '#145a32';
     ctx.beginPath();
     ctx.moveTo(x, horizonY + 4);
-    ctx.lineTo(x + 12, horizonY + 4 - treeH);
+    ctx.lineTo(apexX, apexY);
     ctx.lineTo(x + 24, horizonY + 4);
     ctx.closePath();
     ctx.fill();
-  }
 
-  // 3. Parallax Layer 3: Foreground Prairie & Dirt Wagon Trail (1.0x speed)
-  ctx.fillStyle = '#6e5a11';
-  ctx.fillRect(0, horizonY, width, height - horizonY);
+    // 2px High Sierra / Blue Mountain snow accumulation tint along tree tops
+    if (isSnowing) {
+      ctx.strokeStyle = 'rgba(248, 250, 252, 0.92)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + 4, apexY + treeH * 0.35);
+      ctx.lineTo(apexX, apexY);
+      ctx.lineTo(x + 20, apexY + treeH * 0.35);
+      ctx.stroke();
+    }
+
+    // Pioneer split-rail fence posts every 80px
+    if (Math.abs(Math.floor(x / 40)) % 2 === 0) {
+      ctx.fillStyle = '#4a2306';
+      ctx.fillRect(x + 26, horizonY - 4, 3, 10);
+      ctx.fillRect(x + 38, horizonY - 4, 3, 10);
+      ctx.fillRect(x + 25, horizonY - 2, 16, 2);
+      ctx.fillRect(x + 25, horizonY + 2, 16, 2);
+    }
+  }
 
   // Main beaten dirt track
   ctx.fillStyle = '#876d22';
   ctx.fillRect(0, horizonY + 35, width, 75);
 
-  // Wagon wheel ruts & gravel stones
+  // Wagon wheel ruts & prairie sagebrush tufts
   ctx.fillStyle = '#564504';
-  const rutOffset = (scrollX * 1.5) % 80;
+  const rutOffset = (scrollX * 1.0) % 80;
   for (let rx = -rutOffset; rx < width + 80; rx += 80) {
     ctx.fillRect(rx, horizonY + 50, 48, 3);
     ctx.fillRect(rx + 20, horizonY + 92, 48, 3);
@@ -73,22 +131,69 @@ export function drawBackground1848(ctx, scrollX, width = 800, height = 400) {
 }
 
 /**
- * Renders the 1848 Prairie Schooner Wagon and Yoked Oxen team.
+ * Renders the 1848 Prairie Schooner Wagon, Ground Contact Shadow, Wheel Dust, and Yoked Oxen.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} x Base X coordinate
  * @param {number} y Base Y coordinate
  * @param {number} animTime Elapsed animation time in seconds
  * @param {boolean} isMoving Whether the wagon is actively rolling
+ * @param {Object} [options={}] { pace, isSnowing }
  */
-export function drawSchooner(ctx, x = 250, y = 240, animTime = 0, isMoving = true) {
+export function drawSchooner(ctx, x = 250, y = 240, animTime = 0, isMoving = true, options = {}) {
   ctx.save();
   const bounce = isMoving ? Math.sin(animTime * 9) * 1.8 : 0;
+  const groundY = y + 26;
+  const isGrueling = options.pace === 'grueling' || options.pace === 'cannonball';
+  const isSnowing = Boolean(options.isSnowing);
+
+  // 0. Soft Ground Contact Drop Shadow beneath wagon & oxen (with subtle bounce tracking)
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+  ctx.beginPath();
+  ctx.ellipse(x + 48, groundY + 4, 65 - bounce * 0.8, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x + 150, groundY + 5, 32, 5.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 0.5 Rotating, Fading Wheel Dust Puffs behind rear wheels when moving
+  if (isMoving) {
+    const puffCount = isGrueling ? 5 : 3;
+    const baseAlpha = isGrueling ? 0.36 : 0.20;
+    for (let i = 0; i < puffCount; i++) {
+      const cycle = (animTime * (isGrueling ? 3.4 : 2.2) + i * 0.22) % 1.0;
+      const puffX = x + 12 - cycle * (isGrueling ? 58 : 36);
+      const puffY = groundY + 2 - cycle * 11 + Math.sin(animTime * 6 + i) * 2;
+      const rx = 5 + cycle * (isGrueling ? 11 : 7);
+      const ry = 3.5 + cycle * 6;
+      const alpha = Math.max(0, (1 - cycle) * baseAlpha);
+
+      ctx.save();
+      ctx.translate(puffX, puffY);
+      ctx.rotate(animTime * 2.5 + i * 1.1);
+      ctx.fillStyle = `rgba(194, 162, 110, ${alpha.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
 
   // 1. Canvas Bonnet (Prairie Schooner Cover with Ribs)
   ctx.fillStyle = '#f5eef8';
   ctx.beginPath();
   ctx.ellipse(x + 48, y - 24 + bounce, 48, 28, 0, Math.PI, 0);
   ctx.fill();
+
+  // 2px High Sierra / Blue Mountain snow accumulation tint along wagon canopy crest
+  if (isSnowing) {
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.ellipse(x + 48, y - 25 + bounce, 47, 27, 0, Math.PI * 1.08, -Math.PI * 0.08);
+    ctx.stroke();
+  }
 
   ctx.strokeStyle = '#cbb8d4';
   ctx.lineWidth = 2;

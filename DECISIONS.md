@@ -87,3 +87,7 @@ Rationale: Restores the foundational MECC economic dilemma where purchasing draf
 Date: 2026-11-07
 Decision: Add retro pixel-art landmark postcard optimizer (`scripts/optimize_landmarks.py`), export 320x200 256-color Base64 PNG registry (`app/static/js/cartridges/landmark_cards.js`) for Coffs Harbour (`wp_coffs`), Chimney Rock (`wp_chimney`), and Ballina (`wp_ballina`), and wire postcard rendering into the `LANDMARK_CARD` inspection modal.
 Rationale: Delivers authentic 320x200 8-bit indexed pixel-art landmark postcards with zero external runtime network requests or unbundled asset dependencies.
+
+Date: 2026-11-07
+Decision: Upgrade procedural 2D vector canvas pipeline (`canvas_engine.js`, `renderers_1848.js`, `renderers_2026.js`) with 4-stop volumetric sky gradients + horizon haze, global composite lighting (`multiply` night tint + `screen` radial headlight cones), parametric weather shaders (72-drop rain + road splash ripples, M1 bitumen heat mirage, High Sierra/Blue Mountain 2px snow accumulation), 3-layer aerial perspective silhouettes (0.1x/0.4x/1.0x), ground contact drop shadows + wheel dust puffs, and pre-baked CRT scanlines + radial vignette.
+Rationale: Elevates visual depth, atmospheric lighting, and retro CRT fidelity at 60 FPS using pure hardware-accelerated Canvas 2D compositing and pre-baked offscreen patterns with zero runtime asset overhead.

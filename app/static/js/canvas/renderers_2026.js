@@ -1,38 +1,70 @@
 /**
  * Procedural 2D Vector Renderers for Cartridge 2: 2026 The M1 Gauntlet.
  * Pure Canvas 2D API calls — zero external image assets.
+ *
+ * Implements:
+ * - Dynamic Silhouette Layers with Aerial Perspective (0.1x Far, 0.4x Mid, 1.0x Near)
+ * - Ground Contact Drop Shadows & 3-5 Rotating, Fading Wheel Dust Puffs
+ * - Vehicle LED Headlights & Status VFX (Stink Lines, Toddler Song Notes)
  */
 
 /**
- * Renders 3-layer parallax terrain for the 2026 M1 Pacific Motorway.
+ * Renders 3-layer aerial-perspective parallax terrain for the 2026 M1 Pacific Motorway.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} scrollX Cumulative scroll offset
  * @param {number} width Virtual width (800)
  * @param {number} height Virtual height (400)
+ * @param {Object} [env={}] { skyBucket, isSnowing }
  */
-export function drawBackground2026(ctx, scrollX, width = 800, height = 400) {
+export function drawBackground2026(ctx, scrollX, width = 800, height = 400, env = {}) {
   const horizonY = 240;
+  const bucket = env.skyBucket || 'MIDDAY';
 
-  // 1. Parallax Layer 1: Eucalyptus Great Dividing Range Silhouettes (0.2x speed)
-  const mOffset = (scrollX * 0.2) % 360;
-  ctx.fillStyle = '#143628';
+  // 1. Far Layer (0.1x speed): Low contrast, high tint toward horizon sky color (Great Dividing Range)
+  const farOffset = (scrollX * 0.1) % 360;
+  const farPalette = {
+    DAWN: '#a389a8',     // Hazy coastal lavender
+    MIDDAY: '#63b3cf',   // Hazy subtropical cyan
+    SUNSET: '#9c7389',   // Dusty hinterland mauve
+    NIGHT: '#1d3147',    // Low-contrast night horizon blue
+  };
+  ctx.fillStyle = farPalette[bucket] || '#63b3cf';
   ctx.beginPath();
-  ctx.moveTo(-mOffset, horizonY);
-  for (let x = -mOffset; x < width + 360; x += 90) {
-    const hillH = 48 + ((Math.abs(Math.floor(x / 90)) * 29) % 35);
+  ctx.moveTo(-farOffset, horizonY);
+  for (let x = -farOffset; x < width + 360; x += 90) {
+    const hillH = 60 + ((Math.abs(Math.floor(x / 90)) * 29) % 35);
     ctx.quadraticCurveTo(x + 45, horizonY - hillH, x + 90, horizonY);
   }
   ctx.closePath();
   ctx.fill();
 
-  // 2. Parallax Layer 2: Gum Trees, Golden Wattle & Highway Exit Signs (0.5x speed)
-  const tOffset = (scrollX * 0.5) % 240;
-  for (let x = -tOffset; x < width + 240; x += 60) {
+  // 2. Mid Layer (0.4x speed): Darker tones with crisp geometric peaks & rolling hinterland foothills
+  const midOffset = (scrollX * 0.4) % 240;
+  const midPalette = {
+    DAWN: '#234736',
+    MIDDAY: '#143628',
+    SUNSET: '#1f3b2c',
+    NIGHT: '#0f241c',
+  };
+  ctx.fillStyle = midPalette[bucket] || '#143628';
+  ctx.beginPath();
+  ctx.moveTo(-midOffset, horizonY);
+  for (let x = -midOffset; x < width + 240; x += 80) {
+    const ridgeH = 34 + ((Math.abs(Math.floor(x / 80)) * 31) % 24);
+    ctx.lineTo(x + 36, horizonY - ridgeH);
+    ctx.lineTo(x + 80, horizonY);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // 3. Near Layer (1.0x speed): High contrast, saturated foreground silhouettes (Gum trees, wattle, M1 signs, road)
+  const nearTreeOffset = (scrollX * 1.0) % 240;
+  for (let x = -nearTreeOffset; x < width + 240; x += 60) {
     // Gum tree trunk
     ctx.fillStyle = '#7f8c8d';
     ctx.fillRect(x + 14, horizonY - 22, 4, 24);
-    // Gum canopy
-    ctx.fillStyle = '#1e5631';
+    // Saturated eucalyptus canopy
+    ctx.fillStyle = '#196f3d';
     ctx.beginPath();
     ctx.arc(x + 16, horizonY - 26, 14, 0, Math.PI * 2);
     ctx.fill();
@@ -46,8 +78,8 @@ export function drawBackground2026(ctx, scrollX, width = 800, height = 400) {
     }
   }
 
-  // Green Australian Highway Exit Sign every 480px in Layer 2
-  const signOffset = (scrollX * 0.5) % 480;
+  // Green Australian Highway Exit Sign in Near Layer (1.0x speed)
+  const signOffset = (scrollX * 1.0) % 480;
   const signX = width - signOffset;
   if (signX > -80 && signX < width + 40) {
     ctx.fillStyle = '#95a5a6';
@@ -64,7 +96,7 @@ export function drawBackground2026(ctx, scrollX, width = 800, height = 400) {
     ctx.fillText('M1 NORTH', signX + 31, horizonY - 32);
   }
 
-  // 3. Parallax Layer 3: Two-Lane M1 Motorway Asphalt & Markings (1.0x speed)
+  // Two-Lane M1 Motorway Asphalt & Markings (1.0x speed)
   ctx.fillStyle = '#212f3d';
   ctx.fillRect(0, horizonY, width, height - horizonY);
 
@@ -92,17 +124,50 @@ export function drawBackground2026(ctx, scrollX, width = 800, height = 400) {
 }
 
 /**
- * Renders the 2026 7-Seater Family SUV with Roof Cargo Pod and Active Status VFX.
+ * Renders the 2026 7-Seater Family SUV with Ground Contact Shadow, Wheel Dust, and Active Status VFX.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} x Base X coordinate
  * @param {number} y Base Y coordinate
  * @param {number} animTime Elapsed animation time in seconds
  * @param {boolean} isMoving Whether the SUV is driving
- * @param {Object} [vfxFlags={}] { vfxStinkLines, vfxSongLoop, isNight, timeOfDay }
+ * @param {Object} [vfxFlags={}] { vfxStinkLines, vfxSongLoop, isNight, timeOfDay, pace }
  */
 export function drawSUV(ctx, x = 280, y = 242, animTime = 0, isMoving = true, vfxFlags = {}) {
   ctx.save();
   const bounce = isMoving ? Math.sin(animTime * 11) * 1.2 : 0;
+  const groundY = y + 31;
+  const isCannonball = vfxFlags.pace === 'grueling' || vfxFlags.pace === 'cannonball';
+
+  // 0. Soft Ground Contact Drop Shadow beneath SUV chassis (with subtle bounce tracking)
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+  ctx.beginPath();
+  ctx.ellipse(x + 62, groundY + 4, 68 - bounce * 0.8, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 0.5 Rotating, Fading Wheel Dust / Exhaust Puffs behind rear wheels when moving
+  if (isMoving) {
+    const puffCount = isCannonball ? 5 : 3;
+    const baseAlpha = isCannonball ? 0.34 : 0.18;
+    for (let i = 0; i < puffCount; i++) {
+      const cycle = (animTime * (isCannonball ? 3.8 : 2.5) + i * 0.2) % 1.0;
+      const puffX = x + 14 - cycle * (isCannonball ? 64 : 40);
+      const puffY = groundY - cycle * 12 + Math.sin(animTime * 7 + i) * 2;
+      const rx = 5 + cycle * (isCannonball ? 12 : 7.5);
+      const ry = 3.5 + cycle * 6;
+      const alpha = Math.max(0, (1 - cycle) * baseAlpha);
+
+      ctx.save();
+      ctx.translate(puffX, puffY);
+      ctx.rotate(animTime * 3.0 + i * 1.2);
+      ctx.fillStyle = `rgba(189, 195, 199, ${alpha.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
 
   // 1. Automatic Dusk/Night LED Headlight Cone
   const tod = vfxFlags.timeOfDay ?? 0.35;

@@ -172,9 +172,16 @@ if (!receipt.success || eventEngine.supplies.partA !== 0 || arthur[0].status !==
 
 // 6. CanvasEngine & Procedural Vector Renderers
 const ops = [];
+const gradStops = [];
 const mockCtx = {
   setTransform: () => {},
-  createLinearGradient: () => ({ addColorStop: () => {} }),
+  createLinearGradient: () => ({
+    addColorStop: (offset, color) => { gradStops.push({ offset, color }); }
+  }),
+  createRadialGradient: () => ({
+    addColorStop: (offset, color) => { ops.push('radialStop:' + offset); }
+  }),
+  createPattern: () => 'mockPattern',
   clearRect: () => {},
   fillRect: () => { ops.push('fillRect'); },
   strokeRect: () => {},
@@ -185,7 +192,7 @@ const mockCtx = {
   quadraticCurveTo: () => {},
   bezierCurveTo: () => { ops.push('bezier'); },
   arc: () => {},
-  ellipse: () => {},
+  ellipse: () => { ops.push('ellipse'); },
   roundRect: () => {},
   fill: () => {},
   stroke: () => {},
@@ -193,7 +200,7 @@ const mockCtx = {
   save: () => {},
   restore: () => {},
   translate: () => {},
-  rotate: () => {},
+  rotate: () => { ops.push('rotate'); },
   scale: () => {},
 };
 const mockCanvas = {
@@ -204,9 +211,17 @@ const mockCanvas = {
 };
 const ce = new CanvasEngine(mockCanvas, {
   cartridgeId: 'pacific_2026',
+  pace: 'grueling',
   vfxFlags: { vfxStinkLines: true, vfxSongLoop: true },
   memorials: [{ name: 'Gary', distance: 5, epitaph: 'Stuck in Kempsey' }]
 });
+// Verify 4-stop volumetric sky gradients (0.0, 0.6, 0.85, 1.0) & 72 weather particles
+if (!gradStops.some(s => s.offset === 0.6) || !gradStops.some(s => s.offset === 0.85)) {
+  throw new Error('Expected 4-stop volumetric sky gradients with 0.6 and 0.85 stops');
+}
+if (ce._particles.length < 60 || ce._particles.length > 80) {
+  throw new Error('Expected 60-80 weather particles, got ' + ce._particles.length);
+}
 if (ce.step(30.0) !== 0.05) throw new Error('dt clamp failed');
 const pt = ce.toVirtualCoords(900, 450);
 if (Math.abs(pt.x - 400) > 0.01 || Math.abs(pt.y - 200) > 0.01 || !pt.inBounds) {
@@ -221,7 +236,13 @@ if (!tweenDone || Math.abs(ce.timeOfDay - 0.48) > 0.01) {
 }
 ce.renderFrame();
 if (!ops.includes('bezier')) throw new Error('Expected bezier stink lines in 2026 render');
+if (!ops.includes('ellipse') || !ops.includes('rotate')) {
+  throw new Error('Expected ground contact shadow ellipse and rotating wheel dust puffs');
+}
 ce.cartridgeId = 'oregon_1848';
+ce.timeOfDay = 0.92; // Night composite lighting ('multiply' + 'screen' headlight beam)
+ce.weather = 'SNOW';
+ce.renderFrame();
 ce.weather = 'RAIN';
 ce.renderFrame();
 

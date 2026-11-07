@@ -391,6 +391,7 @@ export function createTrailApp() {
         this.ui.timeOfDay = this._canvasEngine.timeOfDay;
         this.ui.weather = this._canvasEngine.weather;
         this._canvasEngine.currentDistance = this._engine.distance;
+        this._canvasEngine.pace = this._engine.currentPaceKey;
         this._canvasEngine.isAutoMarching = this.isAutoMarching;
         if (nextWp) {
           this._canvasEngine.approachingLandmark = {
