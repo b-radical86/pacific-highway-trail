@@ -75,3 +75,7 @@ Rationale: Infuses authentic historical advice and Aussie road-trip humor while 
 Date: 2026-11-07
 Decision: Implement Phases 3 & 4 authentic 1985 MECC presentation and audio loops (continuous auto-march cadence with [Space] interrupt, approaching landmark vector silhouettes within 100mi/120km horizon window, 8-to-9 option 'Size Up the Situation' console menu, landmark arrival prompt 'Would you like to look around? (Y/N)', visual supplies audit, route map visualizer, and polyphonic chiptune audio tracks).
 Rationale: Restores the iconic rhythmic cadence and tension of 1985 MECC Oregon Trail while delivering authentic polyphonic chiptune renditions of classic 1848 and Aussie larrikin road trip melodies.
+
+Date: 2026-11-07
+Decision: Fix river obstacle waiting loop (`action === 'delay'`) to retain the player on the riverbank, prevent unintended auto-crossing animation, display live conditions (Depth/Width/Weather) with decay notices, and guard trail progression until an explicit crossing action succeeds.
+Rationale: Resolves critical bug where selecting 'Wait to see if conditions improve' triggered the crossing animation and bypassed the river obstacle instead of advancing 1 day/rations on the bank to let river conditions recede.

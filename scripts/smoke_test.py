@@ -495,21 +495,49 @@ riverEngine.activeObstacle = {
   costCents: 500,
   ferryWaitDays: 2
 };
+// 3-Case Parameterized Test for Crossing Mechanics per AGENTS.md Rule 6
+// Case 1 (Failure Reproduction): 'delay' must NEVER cross the river
 const startPhi = riverEngine.activeObstacle.phi;
 const startWidth = riverEngine.activeObstacle.width;
 const delayRes = riverEngine.resolveObstacle('delay');
-if (!delayRes.success || delayRes.newPhi >= startPhi || delayRes.newWidth >= startWidth) {
-  throw new Error('Obstacle delay must decay phi and width: ' + JSON.stringify(delayRes));
+const delayOk =
+  delayRes.success &&
+  delayRes.crossed === false &&
+  riverEngine.activeObstacle !== null &&
+  delayRes.newPhi < startPhi &&
+  delayRes.newWidth < startWidth &&
+  riverEngine.turn === 2 &&
+  riverEngine.supplies.food === 37;
+if (!delayOk) {
+  throw new Error('Case 1 Failed: delay must not cross river: ' + JSON.stringify(delayRes));
 }
 
-// River Ferry Queue Wait Days on 'pay'
+// Case 2 (Adjacent Boundary): 'delay' during RAIN/STORM must swell river depth
+riverEngine.activeObstacle.weather = 'RAIN';
+const rainStartPhi = riverEngine.activeObstacle.phi;
+const rainDelayRes = riverEngine.resolveObstacle('delay');
+const rainDelayOk =
+  rainDelayRes.success &&
+  rainDelayRes.crossed === false &&
+  riverEngine.activeObstacle !== null &&
+  rainDelayRes.newPhi > rainStartPhi &&
+  rainDelayRes.message.includes('swelled');
+if (!rainDelayOk) {
+  throw new Error('Case 2 Failed: rain delay: ' + JSON.stringify(rainDelayRes));
+}
+
+// Case 3 (Valid Crossing): 'pay' ferry burns queue wait days & CLEARS activeObstacle
 const initialTurn = riverEngine.turn;
 const payFerryRes = riverEngine.resolveObstacle('pay');
 const expectedWaitTurn = initialTurn + 2;
 const ferryPayOk =
-  payFerryRes.success && payFerryRes.ferryWaitDays === 2 && riverEngine.turn === expectedWaitTurn;
+  payFerryRes.success &&
+  payFerryRes.crossed === true &&
+  riverEngine.activeObstacle === null &&
+  payFerryRes.ferryWaitDays === 2 &&
+  riverEngine.turn === expectedWaitTurn;
 if (!ferryPayOk) {
-  throw new Error('Ferry pay must burn wait days in queue: ' + JSON.stringify(payFerryRes));
+  throw new Error('Case 3 Failed: Ferry pay must cross river: ' + JSON.stringify(payFerryRes));
 }
 
 // Branching Forks

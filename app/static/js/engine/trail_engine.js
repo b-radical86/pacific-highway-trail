@@ -1097,29 +1097,51 @@ export class CoreTrailEngine {
       }
 
       // Depth & Width decay:
-      // In rain/storm, depth swells (+0.08); otherwise recedes by 0.06 - 0.14 and width shrinks by 4%
-      if (this.weatherSeverity > 1.2 || obs.weather === 'RAIN' || obs.weather === 'STORM') {
-        obs.phi = Math.min(0.95, phi + 0.08);
+      // In rain/storm, depth swells (+0.06 - +0.10); otherwise recedes by 0.06 - 0.14 and width shrinks by 4%
+      const isWet =
+        this.weatherSeverity > 1.2 || obs.weather === 'RAIN' || obs.weather === 'STORM';
+      if (isWet) {
+        const swell = this.prng.range(0.06, 0.1, true);
+        obs.phi = Math.min(0.95, phi + swell);
       } else {
         const decay = this.prng.range(0.06, 0.14, true);
         obs.phi = Math.max(0.15, phi - decay);
         if (typeof obs.width === 'number') {
-          obs.width = Math.max(50, Math.round(obs.width * 0.96 * 10) / 10);
+          const minW = this.cartridgeId === 'pacific_2026' ? 0.8 : 40;
+          obs.width = Math.max(minW, Math.round(obs.width * 0.96 * 10) / 10);
         }
       }
       obs.depth = Number((obs.phi * 10).toFixed(1));
 
+      const conditionMsg =
+        this.cartridgeId === 'pacific_2026'
+          ? isWet
+            ? `Severe rain backed up traffic! Gridlock rose to Level ${obs.depth} (${obs.width} km tailback).`
+            : `Rested 1 stretch. Traffic eased to Level ${obs.depth} (${obs.width} km tailback).`
+          : isWet
+            ? `Heavy rains overnight swelled the river! Depth rose to ${obs.depth} ft (width: ${obs.width} ft).`
+            : `Camped on the bank 1 day. River depth dropped to ${obs.depth} ft (width: ${obs.width} ft).`;
+
+      outcome.action = 'delay';
       outcome.success = true;
+      outcome.crossed = false;
+      outcome.delayed = true;
       outcome.newPhi = obs.phi;
       outcome.newDepth = obs.depth;
       outcome.newWidth = obs.width;
-      outcome.penalty = 'Rested 1 turn. River depth / bottleneck conditions shifted.';
+      outcome.penalty = conditionMsg;
+      outcome.message = conditionMsg;
+      this.logs.push(conditionMsg);
+
+      // IMPORTANT: Player did NOT cross the river; activeObstacle remains active!
+      this.evaluateSurvivalStatus();
       return outcome;
     }
 
-    if (success) {
-      this.activeObstacle = null;
-    }
+    // For all crossing actions (force, adapt, pay, guide):
+    // The player commits to crossing. Clear active obstacle so the player proceeds.
+    this.activeObstacle = null;
+    outcome.crossed = true;
 
     this.evaluateSurvivalStatus();
     return outcome;

@@ -345,7 +345,7 @@ export const OREGON_1848_CARTRIDGE = {
       name: 'Kansas River Crossing',
       distance: 102,
       talkPool: OREGON_1848_TALK_POOLS.kansas_river,
-      obstacle: { type: 'river', phi: 0.35, psi: 0.30, costCents: 500, label: 'Kansas River (Depth: 2.8 ft)' },
+      obstacle: { type: 'river', phi: 0.35, psi: 0.30, costCents: 500, label: 'Kansas River Crossing' },
     },
     {
       id: 'wp_blue',

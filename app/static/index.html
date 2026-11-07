@@ -454,12 +454,12 @@
             <!-- 1985 MECC "Size Up the Situation" Context-Aware Menu -->
             <div class="space-y-1.5 font-mono text-xs">
               <!-- [1] Continue on Trail (Auto-March) -->
-              <button @click="isAutoMarching ? stopAutoMarch() : startAutoMarch()" :disabled="isTraveling"
+              <button @click="ui.activeObstacle ? (activeObstacle = ui.activeObstacle, obstacleNotice = '', modalType = 'OBSTACLE') : (isAutoMarching ? stopAutoMarch() : startAutoMarch())" :disabled="isTraveling"
                       :class="isAutoMarching ? 'from-amber-600 to-amber-700 text-white animate-pulse' : 'from-amber-500 to-amber-600 text-neutral-950'"
                       class="w-full px-2.5 py-1.5 bg-gradient-to-r font-bold rounded flex items-center justify-between text-xs shadow transition active:scale-[0.99] disabled:opacity-50">
                 <span class="flex items-center space-x-1.5">
                   <span class="font-pixel text-[10px]" x-text="isAutoMarching ? '⏸' : '▶'"></span>
-                  <span x-text="isAutoMarching ? 'Size Up Situation' : (ui.currentWaypointName ? (cartridgeId === 'pacific_2026' ? '1. Merge onto M1' : '1. Continue on Trail') : (cartridgeId === 'pacific_2026' ? '1. Keep Driving North' : '1. Continue on Trail'))"></span>
+                  <span x-text="isAutoMarching ? 'Size Up Situation' : (ui.activeObstacle ? (cartridgeId === 'pacific_2026' ? '1. Face Bottleneck' : '1. Cross River') : (ui.currentWaypointName ? (cartridgeId === 'pacific_2026' ? '1. Merge onto M1' : '1. Continue on Trail') : (cartridgeId === 'pacific_2026' ? '1. Keep Driving North' : '1. Continue on Trail')))"></span>
                 </span>
                 <span class="px-1.5 py-0.5 rounded text-[10px]" :class="isAutoMarching ? 'bg-black/40 text-amber-200' : 'bg-amber-700/40 text-neutral-950'">[1 / Space]</span>
               </button>
@@ -609,45 +609,96 @@
 
     <!-- OBSTACLE CROSSING MODAL -->
     <div x-show="modalType === 'OBSTACLE' && activeObstacle" x-transition.opacity
-         class="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="bg-neutral-900 border-2 border-blue-500/80 rounded-xl max-w-xl w-full p-5 shadow-2xl space-y-4">
-        <div class="border-b border-neutral-800 pb-2">
-          <h3 class="font-pixel text-xs text-blue-400" x-text="activeObstacle?.label || 'Obstacle Checkpoint'"></h3>
-          <p class="text-[11px] text-neutral-400 mt-1 font-mono">Evaluate depth & conditions before committing to crossing.</p>
+         class="absolute inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-neutral-900 border-2 border-blue-500/80 rounded-xl max-w-xl w-full p-5 shadow-2xl space-y-3.5">
+        <div class="border-b border-neutral-800 pb-2 flex items-center justify-between">
+          <div>
+            <h3 class="font-pixel text-xs text-blue-400" x-text="activeObstacle?.label || (cartridgeId === 'pacific_2026' ? 'Highway Bottleneck' : 'River Crossing')"></h3>
+            <p class="text-[11px] text-neutral-400 font-mono mt-0.5" x-text="cartridgeId === 'pacific_2026' ? 'Assess tailback & gridlock before attempting to push through.' : 'Evaluate river width & depth before committing your wagon.'"></p>
+          </div>
+          <span class="px-2 py-0.5 rounded bg-blue-950/70 border border-blue-600/50 text-[10px] font-mono text-blue-300">OBSTACLE</span>
         </div>
 
+        <!-- Live Conditions Card -->
+        <div class="grid grid-cols-3 gap-2 bg-black/50 border border-neutral-800 rounded p-3 text-center font-mono">
+          <div class="border-r border-neutral-800 pr-2">
+            <div class="text-[9px] text-neutral-400 uppercase tracking-wider" x-text="cartridgeId === 'pacific_2026' ? 'Congestion' : 'River Depth'"></div>
+            <div class="text-base font-bold text-amber-400 mt-0.5" x-text="cartridgeId === 'pacific_2026' ? ('Level ' + (activeObstacle?.depth ?? 5.0)) : ((activeObstacle?.depth ?? 3.5) + ' ft')"></div>
+            <div class="text-[9px] text-neutral-400 mt-0.5" x-text="cartridgeId === 'pacific_2026' ? (activeObstacle?.phi > 0.6 ? 'Severe Crawl' : 'Moderate Flow') : (activeObstacle?.depth > 2.5 ? '⚠️ Deep Water' : '✅ Shallow')"></div>
+          </div>
+          <div class="border-r border-neutral-800 pr-2">
+            <div class="text-[9px] text-neutral-400 uppercase tracking-wider" x-text="cartridgeId === 'pacific_2026' ? 'Tailback' : 'River Width'"></div>
+            <div class="text-base font-bold text-sky-400 mt-0.5" x-text="cartridgeId === 'pacific_2026' ? ((activeObstacle?.width ?? 3.5) + ' km') : ((activeObstacle?.width ?? 350) + ' ft')"></div>
+            <div class="text-[9px] text-neutral-400 mt-0.5" x-text="cartridgeId === 'pacific_2026' ? 'Backlog length' : 'Bank to bank'"></div>
+          </div>
+          <div>
+            <div class="text-[9px] text-neutral-400 uppercase tracking-wider">Weather</div>
+            <div class="text-base font-bold text-emerald-400 mt-0.5 uppercase" x-text="ui.weather || 'CLEAR'"></div>
+            <div class="text-[9px] text-neutral-400 mt-0.5" x-text="ui.weather === 'RAIN' || ui.weather === 'STORM' ? '⚠️ Swelling depth' : 'Steady conditions'"></div>
+          </div>
+        </div>
+
+        <!-- Feedback Alert after waiting or trying -->
+        <template x-if="obstacleNotice">
+          <div class="p-2.5 bg-blue-950/60 border border-blue-500/70 rounded text-xs text-blue-200 font-mono flex items-start space-x-2">
+            <span class="text-blue-400 text-sm">ℹ️</span>
+            <span x-text="obstacleNotice"></span>
+          </div>
+        </template>
+
+        <!-- Crossing Choices List -->
         <div class="grid grid-cols-2 gap-2 text-xs">
+          <!-- [1] Force / Ford -->
           <button @click="resolveObstacle('force')"
-                  class="p-3 bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 rounded text-left">
-            <div class="font-bold text-amber-400">[1] Force / Ford Crossing</div>
-            <div class="text-[10px] text-neutral-400 mt-1">Brave current. Risk losing traction & supplies.</div>
+                  class="p-2.5 bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 rounded text-left transition group">
+            <div class="font-bold text-amber-400 flex items-center justify-between">
+              <span x-text="cartridgeId === 'pacific_2026' ? '1. Brave Gridlock' : '1. Ford River'"></span>
+              <span class="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700 text-neutral-300 font-mono text-[10px] group-hover:border-amber-500/50">[1]</span>
+            </div>
+            <div class="text-[10px] text-neutral-400 mt-1" x-text="cartridgeId === 'pacific_2026' ? 'Push through bumper-to-bumper. Risk overheating.' : (activeObstacle?.depth > 2.5 ? '⚠️ Water > 2.5 ft! High risk of swamping.' : 'Shallow ford. Free crossing.')"></div>
           </button>
+
+          <!-- [2] Caulk & Float / Detour -->
           <button @click="resolveObstacle('adapt')"
-                  class="p-3 bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 rounded text-left">
-            <div class="font-bold text-emerald-400">[2] Caulk & Float / Detour</div>
-            <div class="text-[10px] text-neutral-400 mt-1">Carpenter / 4WD perks boost success.</div>
+                  class="p-2.5 bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 rounded text-left transition group">
+            <div class="font-bold text-emerald-400 flex items-center justify-between">
+              <span x-text="cartridgeId === 'pacific_2026' ? '2. Backroad Detour' : '2. Caulk Wagon & Float'"></span>
+              <span class="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700 text-neutral-300 font-mono text-[10px] group-hover:border-emerald-500/50">[2]</span>
+            </div>
+            <div class="text-[10px] text-neutral-400 mt-1" x-text="cartridgeId === 'pacific_2026' ? 'Unsealed country detour. 4WD perks boost safety.' : 'Seal wagon bed as a boat. Carpenter perk helps.'"></div>
           </button>
+
+          <!-- [3] Ferry / Toll Road -->
           <button @click="resolveObstacle('pay')"
-                  class="p-3 bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 rounded text-left">
-            <div class="font-bold text-blue-400">[3] Ferry / Toll Road</div>
-            <div class="text-[10px] text-neutral-400 mt-1" x-text="'100% safe. Costs $' + ((activeObstacle?.costCents || 500) * (1 + (activeObstacle?.psi || 0.5)) / 100).toFixed(2)"></div>
+                  class="p-2.5 bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 rounded text-left transition group">
+            <div class="font-bold text-blue-400 flex items-center justify-between">
+              <span x-text="cartridgeId === 'pacific_2026' ? '3. Pay Toll Bypass' : '3. Take Ferry'"></span>
+              <span class="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700 text-neutral-300 font-mono text-[10px] group-hover:border-blue-500/50">[3]</span>
+            </div>
+            <div class="text-[10px] text-neutral-400 mt-1" x-text="'100% safe. Costs $' + ((activeObstacle?.costCents || 500) * (1 + (activeObstacle?.psi || 0.5)) / 100).toFixed(2) + (cartridgeId === 'oregon_1848' ? ' + 1-3 days wait' : '')"></div>
           </button>
+
+          <!-- [4] Wait to See if Conditions Improve -->
           <button @click="resolveObstacle('delay')"
-                  class="p-3 bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 rounded text-left">
-            <div class="font-bold text-neutral-300">[4] Camp / Wait for Conditions</div>
-            <div class="text-[10px] text-neutral-400 mt-1">Costs 1 day & rations. Depth/traffic shifts.</div>
+                  class="p-2.5 bg-neutral-800 hover:bg-neutral-750 border border-neutral-700 rounded text-left transition group">
+            <div class="font-bold text-purple-300 flex items-center justify-between">
+              <span x-text="cartridgeId === 'pacific_2026' ? '4. Rest at Roadhouse' : '4. Camp on Bank & Wait'"></span>
+              <span class="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700 text-neutral-300 font-mono text-[10px] group-hover:border-purple-500/50">[4]</span>
+            </div>
+            <div class="text-[10px] text-neutral-400 mt-1" x-text="cartridgeId === 'pacific_2026' ? 'Spends 1 stretch & snacks. Gridlock may clear.' : 'Spends 1 day & rations. River depth may drop.'"></div>
           </button>
+
+          <!-- [5] Goods Guide / Escort (Optional) -->
           <template x-if="activeObstacle?.guideCost">
             <button @click="resolveObstacle('guide')"
-                    class="col-span-2 p-3 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-500/70 rounded text-left flex items-center justify-between">
+                    class="col-span-2 p-2.5 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-500/70 rounded text-left flex items-center justify-between transition group">
               <div>
                 <div class="font-bold text-amber-300" x-text="'[5] ' + activeObstacle.guideCost.label"></div>
                 <div class="text-[10px] text-neutral-300 mt-0.5">
-                  96% safe passage via goods barter (No cash required — Have:
-                  <strong class="text-amber-400" x-text="ui.supplies[activeObstacle.guideCost.slot] || 0"></strong>)
+                  96% safe passage via barter. Requires <span class="font-bold text-amber-400" x-text="activeObstacle.guideCost.qty + 'x ' + (activeObstacle.guideCost.label || activeObstacle.guideCost.slot)"></span> (Have: <span class="font-bold text-amber-400" x-text="ui.supplies[activeObstacle.guideCost.slot] || 0"></span>)
                 </div>
               </div>
-              <span class="px-2 py-1 rounded bg-amber-900/60 text-amber-200 font-mono text-[10px] border border-amber-600/50">[5]</span>
+              <span class="px-2 py-1 rounded bg-amber-900/60 text-amber-200 font-mono text-[10px] border border-amber-600/50 group-hover:border-amber-400">[5]</span>
             </button>
           </template>
         </div>

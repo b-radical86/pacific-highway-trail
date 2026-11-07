@@ -54,6 +54,7 @@ export function createTrailApp() {
     // Active Dilemma / Obstacle / Economy / Dialogue Data
     activeEvent: null,
     activeObstacle: null,
+    obstacleNotice: '',
     miniGameActive: false,
     midTrailCatalog: [],
     activeTradeState: null,
@@ -361,6 +362,12 @@ export function createTrailApp() {
       this.ui.status = this._engine.status;
       this.ui.lastLog = this._engine.logs[this._engine.logs.length - 1] || 'Trail ahead is clear.';
       this.ui.score = this._engine.calculateScore();
+      this.ui.activeObstacle = this._engine.activeObstacle
+        ? JSON.parse(JSON.stringify(this._engine.activeObstacle))
+        : null;
+      if (this._engine.activeObstacle) {
+        this.activeObstacle = this._engine.activeObstacle;
+      }
 
       if (this._canvasEngine) {
         this.ui.fps = this._canvasEngine.fps;
@@ -410,6 +417,16 @@ export function createTrailApp() {
     advanceTurn() {
       if (this.isTraveling || this.modalType || this.ui.status !== 'IN_PROGRESS') return;
 
+      // Halt if active obstacle has not been crossed!
+      if (this._engine.activeObstacle) {
+        this.stopAutoMarch();
+        this.obstacleNotice = '';
+        this.activeObstacle = this._engine.activeObstacle;
+        this.modalType = 'OBSTACLE';
+        sound.playBeep(380, 'triangle', 0.1);
+        return;
+      }
+
       sound.playBeep(330, 'sawtooth', 0.14);
       this.isTraveling = true;
 
@@ -458,6 +475,13 @@ export function createTrailApp() {
 
     startAutoMarch() {
       if (this.isTraveling || this.modalType || this.ui.status !== 'IN_PROGRESS') return;
+      if (this._engine.activeObstacle) {
+        this.obstacleNotice = '';
+        this.activeObstacle = this._engine.activeObstacle;
+        this.modalType = 'OBSTACLE';
+        sound.playBeep(380, 'triangle', 0.1);
+        return;
+      }
       this.isAutoMarching = true;
       if (this._canvasEngine) this._canvasEngine.isAutoMarching = true;
       this.advanceTurn();
@@ -476,6 +500,7 @@ export function createTrailApp() {
       if (!yes) {
         this.modalType = null;
         if (this._engine.activeObstacle) {
+          this.obstacleNotice = '';
           this.activeObstacle = this._engine.activeObstacle;
           this.modalType = 'OBSTACLE';
         }
@@ -492,6 +517,7 @@ export function createTrailApp() {
     closeLandmarkCard() {
       this.modalType = null;
       if (this._engine.activeObstacle) {
+        this.obstacleNotice = '';
         this.activeObstacle = this._engine.activeObstacle;
         this.modalType = 'OBSTACLE';
       }
@@ -625,7 +651,7 @@ export function createTrailApp() {
 
     resolveObstacle(action) {
       if (!this._engine.activeObstacle) return;
-      const obsSnapshot = this._engine.activeObstacle;
+      const obsSnapshot = JSON.parse(JSON.stringify(this._engine.activeObstacle));
       const perks = { carpenterPerk: this.cartridgeId === 'oregon_1848' && this.selectedOccupationIdx === 1 };
       const outcome = this._engine.resolveObstacle(action, perks);
 
@@ -642,8 +668,25 @@ export function createTrailApp() {
         return;
       }
 
-      // Launch crossing scene animation on canvas
+      // If action is 'delay', player camped/waited on the bank: DO NOT CROSS!
+      if (action === 'delay') {
+        sound.playBeep(440, 'triangle', 0.15);
+        this.obstacleNotice = outcome.message || outcome.penalty || 'Rested 1 turn. River depth shifted.';
+        this.activeObstacle = this._engine.activeObstacle;
+        this.syncSnapshot();
+        this.autoSave();
+
+        // Check if party starved during the wait
+        if (this.ui.status === 'DIED' || this.ui.status === 'U_TURN') {
+          this.modalType = 'GAMEOVER';
+        }
+        return;
+      }
+
+      // Crossing actions (force, adapt, pay, guide):
       this.modalType = null;
+      this.obstacleNotice = '';
+      this.activeObstacle = null;
       sound.playSplash();
 
       const river = new RiverScene({
@@ -652,11 +695,12 @@ export function createTrailApp() {
         onComplete: () => {
           this._canvasEngine.activeScene = null;
           this.syncSnapshot();
+          this.autoSave();
         },
       });
 
       this._canvasEngine.activeScene = river;
-      river.startCrossingAnimation(outcome.success, outcome.success ? 'Crossing successful!' : 'Crossing failed!');
+      river.startCrossingAnimation(outcome.success, outcome.success ? 'Crossing successful!' : (outcome.penalty || 'Crossing failed!'));
     },
 
     openMidTrailStore() {
