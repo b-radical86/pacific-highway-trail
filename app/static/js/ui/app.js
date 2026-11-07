@@ -672,7 +672,8 @@ export function createTrailApp() {
 
       // In mini-game, handle keyboard aiming and firing
       if (this.miniGameActive) {
-        if (e.key === 'Escape') {
+        if (e.key === 'Escape' || e.code === 'Space') {
+          e.preventDefault();
           if (this._canvasEngine && this._canvasEngine.activeScene) {
             this._canvasEngine.activeScene._endGame();
           }
@@ -681,11 +682,11 @@ export function createTrailApp() {
 
         const scene = this._canvasEngine?.activeScene;
         if (scene && typeof scene.handleKeyDown === 'function') {
-          if (e.code === 'Space' || e.key === 'Enter') {
+          if (e.key === 'Enter') {
             e.preventDefault();
             if (this.cartridgeId === 'oregon_1848') sound.playMusket();
             else sound.playHonk();
-            scene.handleKeyDown(' ');
+            scene.handleKeyDown('Enter');
           } else if (
             [
               'ArrowUp',

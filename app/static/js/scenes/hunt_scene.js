@@ -1529,18 +1529,23 @@ export class HuntScene {
         : 'PRAIRIE HUNTING';
     ctx.fillText(`${modeTitle}`, 28, 30);
 
+    // Continue / Pack up prompt
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText('[Space / Esc] Pack Up & Continue', 28, 45);
+
     // Time Progress Gauge
     const timeRatio = Math.max(0, this.timer / this.maxTimer);
     ctx.fillStyle = '#1e293b';
-    ctx.fillRect(28, 36, 170, 10);
+    ctx.fillRect(235, 30, 90, 10);
     ctx.fillStyle = timeRatio > 0.25 ? '#38bdf8' : '#ef4444';
-    ctx.fillRect(28, 36, 170 * timeRatio, 10);
+    ctx.fillRect(235, 30, 90 * timeRatio, 10);
     ctx.strokeStyle = '#475569';
-    ctx.strokeRect(28, 36, 170, 10);
+    ctx.strokeRect(235, 30, 90, 10);
 
     ctx.fillStyle = '#e2e8f0';
     ctx.font = 'bold 10px monospace';
-    ctx.fillText(`${this.timer.toFixed(1)}s`, 208, 45);
+    ctx.fillText(`${this.timer.toFixed(1)}s`, 332, 38);
 
     // Ammo / Shots Remaining
     const isLowAmmo = this.ammo <= 4;
