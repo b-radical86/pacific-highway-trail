@@ -75,6 +75,8 @@ export class CoreTrailEngine {
     this.perks = config.perks || {};
     this.status = 'IN_PROGRESS'; // 'IN_PROGRESS' | 'WON' | 'DIED' | 'U_TURN'
     this.dadEgo = 0;
+    this.hazardMultiplier = config.hazardMultiplier ?? 1.0;
+    this.chosenBranches = Array.isArray(config.chosenBranches) ? [...config.chosenBranches] : [];
     this.activeObstacle = null;
     this.activeTradeOffer = null;
     this.logs = [];
@@ -161,7 +163,12 @@ export class CoreTrailEngine {
 
     const gamma1 = 1 + 1.0 * (1 - hPrimary);
     const gamma2 = 1 + 1.5 * (1 - hSecondary);
-    const prodGamma = gamma1 * gamma2 * Math.pow(paceMult, 1.35) * this.weatherSeverity;
+    const prodGamma =
+      gamma1 *
+      gamma2 *
+      Math.pow(paceMult, 1.35) *
+      this.weatherSeverity *
+      (this.hazardMultiplier || 1.0);
 
     const rawP = 1 - Math.exp(-this.lambdaBase * prodGamma);
     const pClamped = Math.min(0.45, Math.max(0.01, rawP));
@@ -321,6 +328,18 @@ export class CoreTrailEngine {
       if (prep.waypoint.obstacle) {
         this.activeObstacle = JSON.parse(JSON.stringify(prep.waypoint.obstacle));
         this.activeObstacle.waypointId = prep.waypoint.id;
+        if (this.activeObstacle.width === undefined) {
+          this.activeObstacle.width =
+            this.cartridgeId === 'pacific_2026'
+              ? Number(this.prng.range(1.2, 6.5, true).toFixed(1))
+              : Math.round(this.prng.range(180, 650));
+        }
+        if (this.activeObstacle.phi === undefined) {
+          this.activeObstacle.phi = 0.5;
+        }
+        if (this.activeObstacle.depth === undefined) {
+          this.activeObstacle.depth = Number((this.activeObstacle.phi * 10).toFixed(1));
+        }
       }
     } else if (prep.interruptType === 'HAZARD') {
       this.hazardCooldown = 1; // 1-turn cooldown prevents back-to-back hazard loops
@@ -532,7 +551,7 @@ export class CoreTrailEngine {
       return this._storeCache.items;
     }
 
-    const gamma = this.cartridgeId === 'oregon_1848' ? 2.5 : 1.6;
+    const gamma = this.cartridgeId === 'oregon_1848' ? 2.5 : 1.65;
     const dRatio = Math.max(0, Math.min(1.0, this.distance / Math.max(1, this.totalDistance)));
     const inflationFactor = 1.0 + gamma * Math.pow(dRatio, 1.15);
     const markupPct = Math.round((inflationFactor - 1.0) * 100);
@@ -619,15 +638,165 @@ export class CoreTrailEngine {
   }
 
   /**
-   * Attempts an on-demand barter trade with passersby on the trail or at a rest area.
+   * Attempts an authentic MECC 1985 blind barter trade with passersby on the trail or at a rest area.
+   * Does not require the player to pick a wanted item upfront.
    * Immediately consumes 1 day/leg of time and daily rations regardless of whether
    * a trader is found or a deal is accepted.
    *
-   * @param {string} wantedSlotKey Supply slot ('food', 'ammo', 'traction', 'partA', 'partB', 'partC')
    * @param {Object} [customBarterConfig] Optional barter configuration override
    * @returns {Object} Trade attempt result and generated offer (if any)
    */
-  initiateTradeAttempt(wantedSlotKey, customBarterConfig = null) {
+  attemptBlindTrade(customBarterConfig = null) {
+    if (this.status !== 'IN_PROGRESS') {
+      return { success: false, reason: 'GAME_OVER' };
+    }
+
+    const defaultSlots = {
+      food: { label: this.cartridgeId === 'pacific_2026' ? 'Servos Snacks' : 'lbs Food', baseQty: 25 },
+      ammo: { label: this.cartridgeId === 'pacific_2026' ? 'Coins / Fuel' : 'Bullets', baseQty: 20 },
+      traction: { label: this.cartridgeId === 'pacific_2026' ? '% Battery/Tyre' : 'Oxen Yoke', baseQty: 20 },
+      partA: { label: this.cartridgeId === 'pacific_2026' ? 'USB-C Cable' : 'Wagon Wheel', baseQty: 1 },
+      partB: { label: this.cartridgeId === 'pacific_2026' ? 'Coolant Bottle' : 'Wagon Axle', baseQty: 1 },
+      partC: { label: this.cartridgeId === 'pacific_2026' ? 'Wiper Blade' : 'Wagon Tongue', baseQty: 1 },
+    };
+
+    const cfg = customBarterConfig || this.barterConfig || {
+      noTradeText:
+        this.cartridgeId === 'pacific_2026'
+          ? 'Every Grey Nomad in the rest area has their head down eating lukewarm servo pies. Nobody wants to swap today.'
+          : 'No one wants to trade with you today.',
+      slots: defaultSlots,
+      archetypes: [
+        {
+          speaker: this.cartridgeId === 'pacific_2026' ? 'Grey Nomad in a Patrol' : 'Passing Emigrant',
+          text: 'Can spare {offerQty} {offerLabel} if you trade me {demandQty} {demandLabel}.',
+        },
+      ],
+    };
+
+    const slots = cfg.slots || defaultSlots;
+
+    // 1. Spend 1 day / leg and consume daily rations upfront
+    this.turn += 1;
+    const activeParty = this.party.filter((m) => m.health > 0);
+    const foodPerPerson =
+      this.rationTier === 'filling' ? 3 : this.rationTier === 'meager' ? 1.5 : 0.5;
+    const foodNeeded = Math.ceil(activeParty.length * foodPerPerson);
+    const wasStarving = (this.supplies.food || 0) === 0;
+    this.supplies.food = Math.max(0, (this.supplies.food || 0) - foodNeeded);
+
+    if (wasStarving) {
+      for (const m of activeParty) {
+        m.health = Math.max(0, m.health - 8);
+        m.morale = Math.max(0, m.morale - 10);
+      }
+      this.evaluateSurvivalStatus();
+    }
+
+    // 2. Roll for trader availability (25% chance nobody wants to trade)
+    const roll = this.prng.next();
+    if (roll < 0.25) {
+      this.activeTradeOffer = null;
+      const msg = cfg.noTradeText || 'No one willing to trade today.';
+      this.logs.push(`Barter Attempt (Turn ${this.turn}): ${msg}`);
+      return {
+        success: true,
+        foundTrader: false,
+        message: msg,
+      };
+    }
+
+    // 3. Pick offerSlot with desperation bias:
+    // If player has 0 of a critical spare part (partA/B/C) or low traction, 60% bias toward that missing good
+    const criticalParts = ['partA', 'partB', 'partC'].filter((k) => (this.supplies[k] || 0) <= 0);
+    const lowTraction = this.traction <= 30;
+    let offerSlotKey = null;
+
+    if ((criticalParts.length > 0 || lowTraction) && this.prng.next() < 0.60) {
+      if (criticalParts.length > 0 && lowTraction) {
+        offerSlotKey = this.prng.next() < 0.5 ? this.prng.pick(criticalParts) : 'traction';
+      } else if (criticalParts.length > 0) {
+        offerSlotKey = this.prng.pick(criticalParts);
+      } else {
+        offerSlotKey = 'traction';
+      }
+    } else {
+      const allKeys = Object.keys(slots);
+      offerSlotKey = this.prng.pick(allKeys);
+    }
+
+    // Pick demandSlotKey != offerSlotKey
+    const candidateDemands = Object.keys(slots).filter((k) => k !== offerSlotKey);
+    const demandSlotKey = this.prng.pick(candidateDemands);
+    const offerMeta = slots[offerSlotKey];
+    const demandMeta = slots[demandSlotKey];
+
+    // Desperation Demand Multiplier: 1.75x if player is missing the offered good or low traction
+    const isDesperate =
+      offerSlotKey === 'traction'
+        ? this.traction <= 30
+        : (this.supplies[offerSlotKey] || 0) <= 0;
+    const mDesp = isDesperate ? 1.75 : 1.0;
+
+    const offerQty = Math.max(1, offerMeta.baseQty || 1);
+    const demandQty = Math.max(1, Math.ceil((demandMeta.baseQty || 1) * mDesp));
+
+    const canAfford =
+      demandSlotKey === 'traction'
+        ? this.traction > demandQty + 10
+        : (this.supplies[demandSlotKey] || 0) >= demandQty;
+
+    const arch =
+      Array.isArray(cfg.archetypes) && cfg.archetypes.length > 0
+        ? this.prng.pick(cfg.archetypes)
+        : { speaker: 'Trader', text: 'Trade {offerQty} {offerLabel} for {demandQty} {demandLabel}?' };
+
+    const rawTemplate = arch.template || arch.text || 'Trade {offerQty} {offerLabel} for {demandQty} {demandLabel}?';
+    const dialogue = rawTemplate
+      .replace('{offerQty}', String(offerQty))
+      .replace('{offerLabel}', offerMeta.label)
+      .replace('{demandQty}', String(demandQty))
+      .replace('{demandLabel}', demandMeta.label);
+
+    const offer = {
+      wantedSlotKey: offerSlotKey, // for backwards-compatibility
+      offerSlot: offerSlotKey,
+      offerSlotKey,
+      offerQty,
+      offerLabel: offerMeta.label,
+      demandSlot: demandSlotKey,
+      demandSlotKey,
+      demandQty,
+      demandLabel: demandMeta.label,
+      desperate: isDesperate,
+      mDesp,
+      speaker: arch.speaker,
+      npcName: arch.speaker,
+      dialogue,
+      canAfford,
+    };
+
+    this.activeTradeOffer = offer;
+    return {
+      success: true,
+      foundTrader: true,
+      offer,
+    };
+  }
+
+  /**
+   * Attempts an on-demand barter trade with passersby on the trail or at a rest area.
+   * If wantedSlotKey is provided, generates an offer for that slot; otherwise executes attemptBlindTrade.
+   *
+   * @param {string} [wantedSlotKey] Optional supply slot ('food', 'ammo', 'traction', 'partA', 'partB', 'partC')
+   * @param {Object} [customBarterConfig] Optional barter configuration override
+   * @returns {Object} Trade attempt result and generated offer (if any)
+   */
+  initiateTradeAttempt(wantedSlotKey = null, customBarterConfig = null) {
+    if (!wantedSlotKey) {
+      return this.attemptBlindTrade(customBarterConfig);
+    }
+
     if (this.status !== 'IN_PROGRESS') {
       return { success: false, reason: 'GAME_OVER' };
     }
@@ -726,14 +895,18 @@ export class CoreTrailEngine {
 
     const offer = {
       wantedSlotKey,
+      offerSlot: wantedSlotKey,
+      offerSlotKey: wantedSlotKey,
       offerQty,
       offerLabel: wantedMeta.label,
+      demandSlot: demandSlotKey,
       demandSlotKey,
       demandQty,
       demandLabel: demandMeta.label,
       desperate: isDesperate,
       mDesp,
       speaker: arch.speaker,
+      npcName: arch.speaker,
       dialogue,
       canAfford,
     };
@@ -854,6 +1027,30 @@ export class CoreTrailEngine {
       outcome.success = true;
       outcome.costCents = totalCost;
       success = true;
+
+      // Ferry / Bottleneck Queue Wait Days (burns 1-3 days and daily rations in queue)
+      if (obs.type === 'river' || obs.ferryWaitDays !== undefined) {
+        const ferryWaitDays =
+          obs.ferryWaitDays ?? (this.cartridgeId === 'oregon_1848' ? Math.floor(this.prng.range(1, 3)) : 1);
+        if (ferryWaitDays > 0) {
+          this.turn += ferryWaitDays;
+          const activeParty = this.party.filter((m) => m.health > 0);
+          const foodPerPerson =
+            this.rationTier === 'filling' ? 3 : this.rationTier === 'meager' ? 2 : 1;
+          const foodUsed = foodPerPerson * activeParty.length * ferryWaitDays;
+          const wasStarving = (this.supplies.food || 0) === 0;
+          this.supplies.food = Math.max(0, (this.supplies.food || 0) - foodUsed);
+
+          if (wasStarving || this.supplies.food === 0) {
+            for (const m of activeParty) {
+              m.health = Math.max(0, m.health - 5 * ferryWaitDays);
+              m.morale = Math.max(0, (m.morale ?? 100) - 5 * ferryWaitDays);
+            }
+          }
+          outcome.ferryWaitDays = ferryWaitDays;
+          outcome.foodConsumed = foodUsed;
+        }
+      }
     } else if (action === 'guide') {
       const guideCost = obs.guideCost;
       if (!guideCost || !guideCost.slot || !guideCost.qty) {
@@ -882,13 +1079,41 @@ export class CoreTrailEngine {
         outcome.penalty = 'Even with a local guide, a sudden surge bruised the party (-8 HP).';
       }
     } else if (action === 'delay') {
-      // Delay costs a turn & rations, but drifts Phi by +/- 0.1
+      // Delay costs a turn & daily rations, but reduces depth and width (or swells in rain)
       this.turn += 1;
-      const drift = this.prng.range(-0.1, 0.1, true);
-      obs.phi = Math.max(0.15, Math.min(0.95, phi + drift));
+      const activeParty = this.party.filter((m) => m.health > 0);
+      const foodPerPerson =
+        this.rationTier === 'filling' ? 3 : this.rationTier === 'meager' ? 2 : 1;
+      const foodNeeded = foodPerPerson * activeParty.length;
+      const wasStarving = (this.supplies.food || 0) === 0;
+      this.supplies.food = Math.max(0, (this.supplies.food || 0) - foodNeeded);
+
+      if (wasStarving || this.supplies.food === 0) {
+        for (const m of activeParty) {
+          m.health = Math.max(0, m.health - 10);
+          m.morale = Math.max(0, (m.morale ?? 100) - 12);
+          m.status = 'Starving';
+        }
+      }
+
+      // Depth & Width decay:
+      // In rain/storm, depth swells (+0.08); otherwise recedes by 0.06 - 0.14 and width shrinks by 4%
+      if (this.weatherSeverity > 1.2 || obs.weather === 'RAIN' || obs.weather === 'STORM') {
+        obs.phi = Math.min(0.95, phi + 0.08);
+      } else {
+        const decay = this.prng.range(0.06, 0.14, true);
+        obs.phi = Math.max(0.15, phi - decay);
+        if (typeof obs.width === 'number') {
+          obs.width = Math.max(50, Math.round(obs.width * 0.96 * 10) / 10);
+        }
+      }
+      obs.depth = Number((obs.phi * 10).toFixed(1));
+
       outcome.success = true;
       outcome.newPhi = obs.phi;
-      outcome.penalty = 'Rested 1 turn. River depth / traffic conditions shifted.';
+      outcome.newDepth = obs.depth;
+      outcome.newWidth = obs.width;
+      outcome.penalty = 'Rested 1 turn. River depth / bottleneck conditions shifted.';
       return outcome;
     }
 
@@ -898,6 +1123,43 @@ export class CoreTrailEngine {
 
     this.evaluateSurvivalStatus();
     return outcome;
+  }
+
+  /**
+   * Selects an active route fork at a branch point waypoint.
+   * Modifies overall distance delta and hazard multiplier.
+   *
+   * @param {string} branchId Branch choice ID
+   * @returns {{ success: boolean, reason?: string, branch?: Object }}
+   */
+  selectBranch(branchId) {
+    const wp = this.getCurrentWaypoint() || this.getNextWaypoint();
+    if (!wp || !Array.isArray(wp.branches) || wp.branches.length === 0) {
+      return { success: false, reason: 'NO_BRANCHES_AVAILABLE' };
+    }
+
+    const branch = wp.branches.find((b) => b.id === branchId);
+    if (!branch) {
+      return { success: false, reason: 'BRANCH_NOT_FOUND' };
+    }
+
+    this.chosenBranches = this.chosenBranches || [];
+    this.chosenBranches.push(branch.id);
+
+    if (branch.distanceDelta) {
+      this.totalDistance = Math.max(this.distance + 10, this.totalDistance + branch.distanceDelta);
+    }
+    if (branch.hazardMult) {
+      this.hazardMultiplier = Number(((this.hazardMultiplier || 1.0) * branch.hazardMult).toFixed(2));
+    }
+
+    this.logs.push(`Route Fork Chosen: ${branch.label}.`);
+    return {
+      success: true,
+      branch,
+      newTotalDistance: this.totalDistance,
+      newHazardMultiplier: this.hazardMultiplier,
+    };
   }
 
   /**
@@ -981,6 +1243,8 @@ export class CoreTrailEngine {
       rationTier: this.rationTier,
       resolvedWaypoints: Array.from(this.resolvedWaypoints),
       hazardCooldown: this.hazardCooldown,
+      hazardMultiplier: this.hazardMultiplier,
+      chosenBranches: [...(this.chosenBranches || [])],
       status: this.status,
       dadEgo: this.dadEgo,
       activeObstacle: this.activeObstacle ? JSON.parse(JSON.stringify(this.activeObstacle)) : null,
@@ -1006,6 +1270,8 @@ export class CoreTrailEngine {
     this.rationTier = state.rationTier ?? this.rationTier;
     this.resolvedWaypoints = new Set(state.resolvedWaypoints || []);
     this.hazardCooldown = state.hazardCooldown ?? this.hazardCooldown;
+    this.hazardMultiplier = state.hazardMultiplier ?? this.hazardMultiplier;
+    this.chosenBranches = Array.isArray(state.chosenBranches) ? [...state.chosenBranches] : [];
     this.status = state.status ?? this.status;
     this.dadEgo = state.dadEgo ?? this.dadEgo;
     this.activeObstacle = state.activeObstacle ? JSON.parse(JSON.stringify(state.activeObstacle)) : null;

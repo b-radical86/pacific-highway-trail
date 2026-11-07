@@ -63,3 +63,7 @@ Rationale: Completes the canonical Oregon Trail mid-journey economy with distanc
 Date: 2026-11-07
 Decision: Implement animated 24-hour diurnal cycle with campsite/motel overlay for Camp & Rest (`startRestAnimation`), and overhaul hunting game mechanics with difficulty scaling, biome variability (Moose/Bison/Deer/Hares), and 20-35% barren spot rolls.
 Rationale: Adds visual and temporal gravitas to resting by visibly passing an entire day with an atmospheric campfire/motel scene, and restores psychological tension to food acquisition by preventing infinite easy food farming.
+
+Date: 2026-11-07
+Decision: Implement Phase 1 authentic 1985 MECC engine features (`attemptBlindTrade`, river depth/width decay on `delay`, ferry wait days on `pay`, route branch selection `selectBranch`, and distance inflation `gamma = 1.65`).
+Rationale: Establishes blind barter proposal loops, temporal river receding dynamics with queue wait costs, and dynamic fork kinematics directly within headless engine architecture.

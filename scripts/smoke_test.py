@@ -445,6 +445,74 @@ if (barterEngine.cashCents !== 4200) {
   throw new Error('Guide barter must not deduct cashCents');
 }
 
+// 14b. Authentic 1985 Blind Barter, River Width/Depth Decay & Branching Forks
+const blindEngine = new CoreTrailEngine({
+  cartridgeId: 'pacific_2026',
+  prngSeed: 7777,
+  party: [{ name: 'Brad', role: 'primary', health: 100, morale: 100 }],
+  supplies: { food: 50, ammo: 20, partA: 0, partB: 1, partC: 1 }
+});
+const blindRes = blindEngine.attemptBlindTrade();
+if (typeof blindRes.foundTrader !== 'boolean') {
+  throw new Error('attemptBlindTrade returned invalid structure');
+}
+if (blindEngine.turn !== 2 || blindEngine.supplies.food >= 50) {
+  throw new Error('attemptBlindTrade must consume rations and increment turn');
+}
+
+// River Width / Depth Decay on 'delay'
+const riverEngine = new CoreTrailEngine({
+  cartridgeId: 'oregon_1848',
+  prngSeed: 42,
+  party: [{ name: 'Dave', role: 'primary', health: 100, morale: 100 }],
+  supplies: { food: 40, ammo: 10, partA: 1, partB: 1, partC: 1 }
+});
+riverEngine.activeObstacle = {
+  type: 'river',
+  phi: 0.70,
+  psi: 0.50,
+  width: 400,
+  depth: 7.0,
+  costCents: 500,
+  ferryWaitDays: 2
+};
+const startPhi = riverEngine.activeObstacle.phi;
+const startWidth = riverEngine.activeObstacle.width;
+const delayRes = riverEngine.resolveObstacle('delay');
+if (!delayRes.success || delayRes.newPhi >= startPhi || delayRes.newWidth >= startWidth) {
+  throw new Error('Obstacle delay must decay phi and width: ' + JSON.stringify(delayRes));
+}
+
+// River Ferry Queue Wait Days on 'pay'
+const initialTurn = riverEngine.turn;
+const payFerryRes = riverEngine.resolveObstacle('pay');
+const expectedWaitTurn = initialTurn + 2;
+const ferryPayOk =
+  payFerryRes.success && payFerryRes.ferryWaitDays === 2 && riverEngine.turn === expectedWaitTurn;
+if (!ferryPayOk) {
+  throw new Error('Ferry pay must burn wait days in queue: ' + JSON.stringify(payFerryRes));
+}
+
+// Branching Forks
+riverEngine.waypoints = [
+  {
+    id: 'wp_fork',
+    name: 'South Pass Fork',
+    distance: 100,
+    branches: [
+      { id: 'sublette', label: 'Sublette Cutoff', distanceDelta: -50, hazardMult: 1.5 },
+      { id: 'bridger', label: 'Fort Bridger Detour', distanceDelta: 65, hazardMult: 0.85 }
+    ]
+  }
+];
+riverEngine.distance = 100;
+const branchRes = riverEngine.selectBranch('sublette');
+const branchOk =
+  branchRes.success && branchRes.newHazardMultiplier === 1.5 && riverEngine.totalDistance === 1950;
+if (!branchOk) {
+  throw new Error('selectBranch failed: ' + JSON.stringify(branchRes));
+}
+
 // 15. HuntScene: Difficulty scaling, Biomes, and Barren spots
 const easyHunt = new HuntScene({
   cartridgeId: 'oregon_1848',
