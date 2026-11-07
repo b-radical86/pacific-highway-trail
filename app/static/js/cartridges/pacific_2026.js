@@ -117,6 +117,7 @@ export const PACIFIC_2026_CARTRIDGE = {
       servoStop: true,
       hasStore: true,
       storeName: 'Woolworths & Servo Express (Pennant Hills)',
+      isCheckpoint: true,
     },
     {
       id: 'wp_hawkesbury',
@@ -132,6 +133,7 @@ export const PACIFIC_2026_CARTRIDGE = {
       servoStop: true,
       hasStore: true,
       storeName: 'Heatherbrae Highway Servo & Pie Warmers',
+      isCheckpoint: true,
     },
     {
       id: 'wp_port_mac',
@@ -141,6 +143,7 @@ export const PACIFIC_2026_CARTRIDGE = {
       servoStop: true,
       hasStore: true,
       storeName: 'Port Macquarie 24hr Highway Roadhouse',
+      isCheckpoint: true,
     },
     {
       id: 'wp_kempsey',
@@ -167,6 +170,7 @@ export const PACIFIC_2026_CARTRIDGE = {
       servoStop: true,
       hasStore: true,
       storeName: 'Coffs Harbour Big Banana Gift Shop & Servo',
+      isCheckpoint: true,
     },
     { id: 'wp_maclean', name: 'Maclean & Brooms Head Turnoff', distance: 660, landmark: true },
     {
@@ -177,6 +181,7 @@ export const PACIFIC_2026_CARTRIDGE = {
       servoStop: true,
       hasStore: true,
       storeName: 'Ballina Highway Oasis & Bait Shop',
+      isCheckpoint: true,
     },
     {
       id: 'wp_border',
@@ -194,7 +199,7 @@ export const PACIFIC_2026_CARTRIDGE = {
         guideCost: { slot: 'food', qty: 25, label: 'Choccy Milk & Red Frog Peace Accord (25 Snacks)' },
       },
     },
-    { id: 'wp_brisbane', name: 'Brisbane River / Northern Suburbs', distance: 920, landmark: true, goal: true },
+    { id: 'wp_brisbane', name: 'Brisbane River / Northern Suburbs', distance: 920, landmark: true, goal: true, isCheckpoint: true },
   ],
 
   // 10 Declarative Hamish & Andy Road Trip Hazards

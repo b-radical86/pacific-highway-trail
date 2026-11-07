@@ -40,6 +40,7 @@ export function createTrailApp() {
     leaderboard: [],
     hasSavedGame: false,
     savedGameMeta: null,
+    checkpointSavedFlash: false,
 
     // UI Controls & Toggles
     crtEnabled: false,
@@ -102,10 +103,11 @@ export function createTrailApp() {
 
     checkSavedGame() {
       const save = StorageManager.loadGame();
-      if (save && save.cartridgeId === this.cartridgeId && save.distance > 0) {
+      if (save && save.cartridgeId === this.cartridgeId && save.distance >= 0) {
         this.hasSavedGame = true;
         this.savedGameMeta = {
           distance: save.distance,
+          waypointName: save.waypointName || (save.distance === 0 ? 'Trailhead Departure' : 'Waypoint Checkpoint'),
           turn: save.turn,
           savedAt: save.savedAt,
           supplies: save.supplies,
@@ -157,12 +159,24 @@ export function createTrailApp() {
       }
     },
 
-    autoSave() {
+    autoSave(isExplicitCheckpoint = false) {
       if (!this._engine || this.ui.status !== 'IN_PROGRESS') return;
+
+      const curWp = this._engine.getCurrentWaypoint();
+      const isCheckpointWaypoint = Boolean(curWp && curWp.isCheckpoint);
+
+      // Enforce hardcore waypoint checkpoint saves:
+      // Saving ONLY occurs at designated major waypoints/forts/servos or pre-departure outfitter
+      if (!isExplicitCheckpoint && !isCheckpointWaypoint) {
+        return;
+      }
+
       StorageManager.saveGame({
         cartridgeId: this.cartridgeId,
         occupationIdx: this.selectedOccupationIdx,
         distance: this._engine.distance,
+        waypointId: curWp?.id || 'start',
+        waypointName: curWp?.name || 'Trailhead',
         turn: this._engine.turn,
         cashCents: this._engine.cashCents,
         party: this._engine.party,
@@ -170,6 +184,11 @@ export function createTrailApp() {
         resolvedWaypoints: Array.from(this._engine.resolvedWaypoints || []),
         flags: this._eventManager?.flags || {},
       });
+
+      this.checkpointSavedFlash = true;
+      setTimeout(() => {
+        this.checkpointSavedFlash = false;
+      }, 2500);
     },
 
     async submitAndRestart() {
@@ -291,7 +310,7 @@ export function createTrailApp() {
       sound.playFanfare();
       this.syncSnapshot();
       this.screen = 'GAME';
-      this.autoSave();
+      this.autoSave(true); // Save initial departure checkpoint
     },
 
     initCanvas() {
@@ -333,6 +352,7 @@ export function createTrailApp() {
       this.ui.currentStoreName =
         curWp?.storeName ||
         (this.cartridgeId === 'pacific_2026' ? 'Highway Servo Store' : 'Fort Trading Post');
+      this.ui.isAtCheckpoint = Boolean(curWp && curWp.isCheckpoint);
       this.ui.status = this._engine.status;
       this.ui.lastLog = this._engine.logs[this._engine.logs.length - 1] || 'Trail ahead is clear.';
       this.ui.score = this._engine.calculateScore();

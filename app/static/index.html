@@ -112,6 +112,7 @@
                 <span class="text-[9px] font-mono text-neutral-400" x-text="'Saved: ' + (savedGameMeta?.savedAt ? new Date(savedGameMeta.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '')"></span>
               </div>
               <div class="text-xs font-mono text-neutral-200">
+                <span class="text-emerald-300 font-bold" x-text="savedGameMeta?.waypointName"></span> •
                 Turn <strong class="text-amber-400" x-text="savedGameMeta?.turn"></strong> •
                 Distance: <strong class="text-amber-400" x-text="savedGameMeta?.distance + ' ' + (cartridgeId === 'pacific_2026' ? 'km' : 'mi')"></strong> •
                 Food: <strong class="text-neutral-100" x-text="savedGameMeta?.supplies?.food"></strong>
@@ -404,8 +405,20 @@
                 <div class="bg-gradient-to-r from-amber-600 to-amber-400 h-full rounded-full transition-all duration-300"
                      :style="'width: ' + ((ui.distance / ui.totalDistance) * 100) + '%'"></div>
               </div>
-              <div class="text-[9px] font-mono text-neutral-400 truncate pt-0.5">
-                Next: <span class="text-neutral-200" x-text="ui.nextWaypointName"></span>
+              <div class="text-[9px] font-mono text-neutral-400 truncate pt-0.5 flex justify-between items-center">
+                <span>Next: <span class="text-neutral-200" x-text="ui.nextWaypointName"></span></span>
+                <template x-if="ui.isAtCheckpoint">
+                  <span class="px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-700/60 font-mono text-[8px] font-bold">
+                    📍 CHECKPOINT
+                  </span>
+                </template>
+              </div>
+
+              <!-- Checkpoint Save Notification Flash -->
+              <div x-show="checkpointSavedFlash" x-transition.opacity
+                   class="mt-1 px-2 py-1 bg-emerald-950/90 border border-emerald-500 rounded text-[10px] font-mono text-emerald-300 font-bold flex items-center justify-between">
+                <span>💾 CHECKPOINT AUTOSAVED</span>
+                <span class="text-[9px] text-emerald-400 font-normal" x-text="ui.currentWaypointName"></span>
               </div>
 
               <!-- HUD Status Badges: Starvation Alert & Pace Wear -->

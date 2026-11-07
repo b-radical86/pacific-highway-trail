@@ -113,6 +113,7 @@ export const OREGON_1848_CARTRIDGE = {
       tradingPost: true,
       hasStore: true,
       storeName: "Matt's General Store (Independence)",
+      isCheckpoint: true,
     },
     {
       id: 'wp_kansas',
@@ -134,6 +135,7 @@ export const OREGON_1848_CARTRIDGE = {
       tradingPost: true,
       hasStore: true,
       storeName: "Fort Kearney Sutler's Post",
+      isCheckpoint: true,
     },
     { id: 'wp_chimney', name: 'Chimney Rock', distance: 554, landmark: true },
     {
@@ -144,9 +146,10 @@ export const OREGON_1848_CARTRIDGE = {
       tradingPost: true,
       hasStore: true,
       storeName: 'Fort Laramie Trading Co.',
+      isCheckpoint: true,
     },
     { id: 'wp_indep_rock', name: 'Independence Rock', distance: 830, landmark: true },
-    { id: 'wp_south_pass', name: 'South Pass (Continental Divide)', distance: 932, landmark: true },
+    { id: 'wp_south_pass', name: 'South Pass (Continental Divide)', distance: 932, landmark: true, isCheckpoint: true },
     {
       id: 'wp_green',
       name: 'Green River Crossing',
@@ -161,6 +164,7 @@ export const OREGON_1848_CARTRIDGE = {
       tradingPost: true,
       hasStore: true,
       storeName: "Hudson's Bay Co. Post (Fort Hall)",
+      isCheckpoint: true,
     },
     {
       id: 'wp_snake',
@@ -187,8 +191,9 @@ export const OREGON_1848_CARTRIDGE = {
         label: 'Columbia River Gorge / $8.00 Barlow Road Toll',
         guideCost: { slot: 'food', qty: 30, label: 'Hire Local Portage Crew (30 lbs Food)' },
       },
+      isCheckpoint: true,
     },
-    { id: 'wp_willamette', name: 'Willamette Valley, Oregon', distance: 2000, landmark: true, goal: true },
+    { id: 'wp_willamette', name: 'Willamette Valley, Oregon', distance: 2000, landmark: true, goal: true, isCheckpoint: true },
   ],
 
   // 10 Classic Declarative Hazards & Events
