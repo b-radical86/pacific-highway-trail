@@ -12,7 +12,7 @@ import { EventManager } from '../engine/event_manager.js';
 import { CanvasEngine } from '../canvas/canvas_engine.js';
 import { RiverScene } from '../scenes/river_scene.js';
 import { HuntScene } from '../scenes/hunt_scene.js';
-import { sound } from './audio_synth.js';
+import { sound, playLandmarkTheme } from './audio_synth.js';
 import { StorageManager } from '../engine/storage.js';
 import { OREGON_1848_CARTRIDGE } from '../cartridges/oregon_1848.js';
 import { PACIFIC_2026_CARTRIDGE } from '../cartridges/pacific_2026.js';
@@ -46,15 +46,20 @@ export function createTrailApp() {
     crtEnabled: false,
     soundMuted: false,
     isTraveling: false,
-    modalType: null, // null | 'DILEMMA' | 'OBSTACLE' | 'OUTFITTER' | 'VICTORY' | 'GAMEOVER' | 'EXIT'
+    isAutoMarching: false,
+    _autoMarchTimer: null,
+    modalType: null, // null | 'DILEMMA' | 'OBSTACLE' | 'OUTFITTER' | 'VICTORY' | 'GAMEOVER' | 'EXIT' | 'LOOK_AROUND' | 'LANDMARK_CARD' | 'TALK' | 'SUPPLIES' | 'MAP'
     warningModal: null, // null | { title, message, confirmLabel, cancelLabel, action }
 
-    // Active Dilemma / Obstacle / Economy Data
+    // Active Dilemma / Obstacle / Economy / Dialogue Data
     activeEvent: null,
     activeObstacle: null,
     miniGameActive: false,
     midTrailCatalog: [],
     activeTradeState: null,
+    activeTalkPool: [],
+    talkIndex: 0,
+    arrivedWaypoint: null,
 
     // Shallow Snapshot mirrored from CoreTrailEngine for Alpine DOM rendering
     ui: {
@@ -362,8 +367,23 @@ export function createTrailApp() {
         this.ui.timeOfDay = this._canvasEngine.timeOfDay;
         this.ui.weather = this._canvasEngine.weather;
         this._canvasEngine.currentDistance = this._engine.distance;
-        this._canvasEngine.vfxFlags.vfxStinkLines = (this._eventManager.flags.vfxStinkLines ?? (this.cartridgeId === 'pacific_2026' && this.ui.party.some(m => m.status === 'Code Brown')));
-        this._canvasEngine.vfxFlags.vfxSongLoop = (this._eventManager.flags.vfxSongLoop ?? false);
+        this._canvasEngine.isAutoMarching = this.isAutoMarching;
+        if (nextWp) {
+          this._canvasEngine.approachingLandmark = {
+            id: nextWp.id,
+            name: nextWp.name,
+            distRemaining: nextWp.distance - this._engine.distance,
+            approachWindow: this.cartridgeId === 'pacific_2026' ? 120 : 100,
+          };
+        } else {
+          this._canvasEngine.approachingLandmark = null;
+        }
+        this._canvasEngine.vfxFlags.vfxStinkLines =
+          this._eventManager.flags.vfxStinkLines ??
+          (this.cartridgeId === 'pacific_2026' &&
+            this.ui.party.some((m) => m.status === 'Code Brown'));
+        this._canvasEngine.vfxFlags.vfxSongLoop =
+          this._eventManager.flags.vfxSongLoop ?? false;
       }
     },
 
@@ -407,12 +427,11 @@ export function createTrailApp() {
 
         // 4. Handle interrupt presentation
         if (prep.interruptType === 'WAYPOINT') {
-          sound.playFanfare();
-          if (this._engine.activeObstacle) {
-            this.activeObstacle = this._engine.activeObstacle;
-            this.modalType = 'OBSTACLE';
-          }
+          this.stopAutoMarch();
+          this.arrivedWaypoint = prep.waypoint;
+          this.modalType = 'LOOK_AROUND';
         } else if (prep.interruptType === 'HAZARD') {
+          this.stopAutoMarch();
           sound.playStinkBuzzer();
           const event = this._eventManager.pickEligibleEvent(this._engine);
           if (event) {
@@ -420,13 +439,111 @@ export function createTrailApp() {
             this.modalType = 'DILEMMA';
           }
         } else if (prep.interruptType === 'ARRIVAL') {
+          this.stopAutoMarch();
           sound.playFanfare();
           this.modalType = 'VICTORY';
         } else if (this.ui.status === 'DIED' || this.ui.status === 'U_TURN') {
+          this.stopAutoMarch();
           sound.playStinkBuzzer();
           this.modalType = 'GAMEOVER';
+        } else if (this.isAutoMarching && !this.modalType && this.ui.status === 'IN_PROGRESS') {
+          this._autoMarchTimer = setTimeout(() => {
+            if (this.isAutoMarching && !this.modalType && this.ui.status === 'IN_PROGRESS') {
+              this.advanceTurn();
+            }
+          }, 1200);
         }
       });
+    },
+
+    startAutoMarch() {
+      if (this.isTraveling || this.modalType || this.ui.status !== 'IN_PROGRESS') return;
+      this.isAutoMarching = true;
+      if (this._canvasEngine) this._canvasEngine.isAutoMarching = true;
+      this.advanceTurn();
+    },
+
+    stopAutoMarch() {
+      if (this._autoMarchTimer) {
+        clearTimeout(this._autoMarchTimer);
+        this._autoMarchTimer = null;
+      }
+      this.isAutoMarching = false;
+      if (this._canvasEngine) this._canvasEngine.isAutoMarching = false;
+    },
+
+    confirmLookAround(yes) {
+      if (!yes) {
+        this.modalType = null;
+        if (this._engine.activeObstacle) {
+          this.activeObstacle = this._engine.activeObstacle;
+          this.modalType = 'OBSTACLE';
+        }
+        return;
+      }
+
+      const wp = this.arrivedWaypoint || this._engine.getCurrentWaypoint();
+      if (wp) {
+        playLandmarkTheme(this.cartridgeId, wp.id);
+      }
+      this.modalType = 'LANDMARK_CARD';
+    },
+
+    closeLandmarkCard() {
+      this.modalType = null;
+      if (this._engine.activeObstacle) {
+        this.activeObstacle = this._engine.activeObstacle;
+        this.modalType = 'OBSTACLE';
+      }
+    },
+
+    openTalkModal() {
+      if (this.isTraveling) return;
+      const curWp = this._engine.getCurrentWaypoint() || this.arrivedWaypoint;
+      const pool = curWp?.talkPool || [];
+      if (pool.length === 0) return;
+      sound.playBeep(450, 'triangle', 0.12);
+      this.activeTalkPool = pool;
+      this.talkIndex = 0;
+      this.modalType = 'TALK';
+    },
+
+    nextTalkQuote() {
+      if (!this.activeTalkPool || this.activeTalkPool.length === 0) return;
+      sound.playBeep(520, 'sine', 0.1);
+      this.talkIndex = (this.talkIndex + 1) % this.activeTalkPool.length;
+    },
+
+    cycleRations() {
+      sound.playBeep(400, 'square', 0.08);
+      const tiers = ['filling', 'meager', 'bare_bones'];
+      const curIdx = tiers.indexOf(this._engine.rationTier);
+      this._engine.rationTier = tiers[(curIdx + 1) % tiers.length];
+      this.syncSnapshot();
+    },
+
+    openSuppliesModal() {
+      if (this.isTraveling) return;
+      sound.playBeep(440, 'triangle', 0.1);
+      this.modalType = 'SUPPLIES';
+    },
+
+    openMapModal() {
+      if (this.isTraveling) return;
+      sound.playBeep(460, 'triangle', 0.1);
+      this.modalType = 'MAP';
+    },
+
+    chooseRouteBranch(branchId) {
+      const res = this._engine.selectBranch(branchId);
+      if (!res.success) {
+        sound.playStinkBuzzer();
+        return;
+      }
+      sound.playFanfare();
+      this.modalType = null;
+      this.syncSnapshot();
+      this.autoSave();
     },
 
     restTurn(force = false) {
@@ -574,8 +691,20 @@ export function createTrailApp() {
     openTradeModal() {
       if (this.isTraveling || this.modalType || this.ui.status !== 'IN_PROGRESS') return;
       sound.playBeep(440, 'triangle', 0.1);
-      this.activeTradeState = { step: 'SELECT', result: null };
+      const res = this._engine.attemptBlindTrade();
+      if (res.foundTrader) {
+        sound.playBeep(540, 'sine', 0.15);
+      } else {
+        sound.playStinkBuzzer();
+      }
+      this.activeTradeState = { step: 'OFFER', result: res };
       this.modalType = 'BARTER';
+      this.syncSnapshot();
+      this.autoSave();
+
+      if (this.ui.status === 'DIED' || this.ui.status === 'U_TURN') {
+        this.modalType = 'GAMEOVER';
+      }
     },
 
     selectTradeWanted(slotKey) {
@@ -835,6 +964,49 @@ export function createTrailApp() {
 
     handleTrailKeys(e) {
       // Modals during trail gameplay
+      if (this.modalType === 'LOOK_AROUND') {
+        if (e.key === 'y' || e.key === 'Y' || e.key === 'Enter') {
+          this.confirmLookAround(true);
+        } else if (e.key === 'n' || e.key === 'N' || e.key === 'Escape') {
+          this.confirmLookAround(false);
+        }
+        return;
+      }
+
+      if (this.modalType === 'LANDMARK_CARD') {
+        if (e.key === 't' || e.key === 'T' || e.key === '8') {
+          this.openTalkModal();
+        } else if ((e.key === 's' || e.key === 'S' || e.key === '9') && this.ui.canUseStore) {
+          this.openMidTrailStore();
+        } else if (e.key === 'Escape' || e.code === 'Space' || e.key === 'Enter') {
+          this.closeLandmarkCard();
+        }
+        return;
+      }
+
+      if (this.modalType === 'TALK') {
+        if (e.code === 'Space' || e.key === 't' || e.key === 'T') {
+          this.nextTalkQuote();
+        } else if (e.key === 'Escape' || e.key === 'Enter') {
+          this.modalType = null;
+        }
+        return;
+      }
+
+      if (this.modalType === 'SUPPLIES') {
+        if (e.key === 'Escape' || e.code === 'Space' || e.key === 'Enter' || e.key === '2') {
+          this.modalType = null;
+        }
+        return;
+      }
+
+      if (this.modalType === 'MAP') {
+        if (e.key === 'Escape' || e.code === 'Space' || e.key === 'Enter' || e.key === '3') {
+          this.modalType = null;
+        }
+        return;
+      }
+
       if (this.modalType === 'DILEMMA' && this.activeEvent) {
         if (e.key === 'Escape') this.modalType = null;
         if (e.key === '1' && this.activeEvent.choices[0]) this.resolveDilemmaChoice(this.activeEvent.choices[0]);
@@ -881,7 +1053,7 @@ export function createTrailApp() {
           const offer = this.activeTradeState.result?.offer;
           if ((e.key === 'y' || e.key === 'Y' || e.key === 'Enter') && offer && offer.canAfford) {
             this.confirmTradeDeal();
-          } else if (e.key === 'n' || e.key === 'N' || e.key === 'Enter') {
+          } else if (e.key === 'n' || e.key === 'N' || e.key === 'Escape') {
             this.modalType = null;
             this.activeTradeState = null;
           }
@@ -896,13 +1068,56 @@ export function createTrailApp() {
         return;
       }
 
-      // Main console keyboard hotkeys
+      // If in Auto-March, Space or Enter pauses and sizes up the situation
+      if (this.isAutoMarching) {
+        if (e.code === 'Space' || e.key === 'Enter') {
+          e.preventDefault();
+          this.stopAutoMarch();
+          return;
+        }
+      }
+
+      // Authentic 1985 MECC "Size Up the Situation" Numbered Keys
+      if (e.key === '1') {
+        this.startAutoMarch();
+        return;
+      } else if (e.key === '2') {
+        this.openSuppliesModal();
+        return;
+      } else if (e.key === '3') {
+        this.openMapModal();
+        return;
+      } else if (e.key === '4') {
+        this.cyclePace();
+        return;
+      } else if (e.key === '5') {
+        this.cycleRations();
+        return;
+      } else if (e.key === '6') {
+        this.restTurn();
+        return;
+      } else if (e.key === '7') {
+        this.openTradeModal();
+        return;
+      } else if (e.key === '8') {
+        if (this.ui.currentWaypointName) {
+          this.openTalkModal();
+        } else {
+          this.launchMiniGame();
+        }
+        return;
+      } else if (e.key === '9' && this.ui.canUseStore) {
+        this.openMidTrailStore();
+        return;
+      }
+
+      // Traditional hotkey shortcuts
       if (e.code === 'Space') {
         e.preventDefault();
         if (this.isTraveling) {
           this._canvasEngine.skipTravelAnimation();
         } else {
-          this.advanceTurn();
+          this.startAutoMarch();
         }
       } else if (e.key === 'r' || e.key === 'R') {
         this.restTurn();

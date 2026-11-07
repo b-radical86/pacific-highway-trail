@@ -52,6 +52,8 @@ export class CanvasEngine {
     // Roadside memorials [{ name, distance, epitaph, status }]
     this.memorials = Array.isArray(options.memorials) ? options.memorials : [];
     this.currentDistance = 0;
+    this.approachingLandmark = options.approachingLandmark || null;
+    this.isAutoMarching = options.isAutoMarching ?? false;
 
     // Pluggable scene override for Phase 4 mini-games (SCENE_RIVER, SCENE_HUNT)
     this.activeScene = null;
@@ -338,6 +340,9 @@ export class CanvasEngine {
       drawBackground2026(ctx, this.scrollX, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
     }
 
+    // 2.5 Approaching Landmark Horizon Silhouette
+    this._renderApproachingLandmark(ctx);
+
     // 3. Roadside Memorials / Past Run Tombstones
     this._renderMemorials(ctx);
 
@@ -360,6 +365,11 @@ export class CanvasEngine {
 
     // 5. Weather Particle Overlay
     this._renderWeatherOverlay(ctx);
+
+    // 6. Auto-March "Size Up the Situation" Retro Banner
+    if (this.isAutoMarching) {
+      this._renderAutoMarchBanner(ctx);
+    }
   }
 
   _renderCampsite1848(ctx, fireX, fireY) {
@@ -435,6 +445,211 @@ export class CanvasEngine {
     ctx.fillStyle = '#38bdf8';
     ctx.font = 'bold 9px monospace';
     ctx.fillText('REST STOP', campX - 24, campY - 24);
+    ctx.restore();
+  }
+
+  _renderApproachingLandmark(ctx) {
+    if (!this.approachingLandmark) return;
+    const { id, name, distRemaining, approachWindow } = this.approachingLandmark;
+    const windowDist = approachWindow || (this.cartridgeId === 'pacific_2026' ? 120 : 100);
+    if (distRemaining > windowDist || distRemaining <= 0) return;
+
+    const progress = Math.max(0, Math.min(1.0, 1.0 - distRemaining / windowDist));
+    const lx = 60 + progress * 200;
+    const ly = 238;
+    const scale = 0.55 + progress * 0.45;
+
+    ctx.save();
+    ctx.translate(lx, ly);
+    ctx.scale(scale, scale);
+
+    const key = (id || name || '').toLowerCase();
+    if (this.cartridgeId === 'oregon_1848') {
+      this._draw1848LandmarkSprite(ctx, key);
+    } else {
+      this._draw2026LandmarkSprite(ctx, key);
+    }
+    ctx.restore();
+  }
+
+  _draw1848LandmarkSprite(ctx, key) {
+    if (key.includes('fort') || key.includes('kearney') || key.includes('laramie') || key.includes('hall')) {
+      // Wooden fort stockade & American flag
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(-22, -26, 44, 26);
+      ctx.fillStyle = '#92400e';
+      ctx.fillRect(-10, -42, 20, 16);
+      // Roof
+      ctx.fillStyle = '#451a03';
+      ctx.beginPath();
+      ctx.moveTo(-14, -42);
+      ctx.lineTo(0, -52);
+      ctx.lineTo(14, -42);
+      ctx.fill();
+      // Flagpole
+      ctx.strokeStyle = '#d6d3d1';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, -52);
+      ctx.lineTo(0, -66);
+      ctx.stroke();
+      // Flag
+      ctx.fillStyle = '#dc2626';
+      ctx.fillRect(0, -66, 12, 8);
+    } else if (key.includes('chimney')) {
+      // Chimney Rock Spire
+      ctx.fillStyle = '#9a3412';
+      ctx.beginPath();
+      ctx.moveTo(-28, 0);
+      ctx.lineTo(-12, -25);
+      ctx.lineTo(-4, -65);
+      ctx.lineTo(4, -65);
+      ctx.lineTo(12, -25);
+      ctx.lineTo(28, 0);
+      ctx.closePath();
+      ctx.fill();
+    } else if (key.includes('rock')) {
+      // Independence Rock dome
+      ctx.fillStyle = '#78716c';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 38, 22, 0, Math.PI, 0);
+      ctx.fill();
+    } else if (key.includes('river') || key.includes('kansas') || key.includes('blue') || key.includes('green') || key.includes('snake')) {
+      // River crossing trees & ferry post
+      ctx.fillStyle = '#166534';
+      ctx.beginPath();
+      ctx.arc(-14, -20, 14, 0, Math.PI * 2);
+      ctx.arc(8, -18, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#713f12';
+      ctx.fillRect(-16, -10, 4, 10);
+      ctx.fillRect(6, -8, 4, 8);
+      // Ferry post
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(16, -24, 3, 24);
+    } else {
+      // Mountain divide pass
+      ctx.fillStyle = '#cbd5e1';
+      ctx.beginPath();
+      ctx.moveTo(-35, 0);
+      ctx.lineTo(-12, -40);
+      ctx.lineTo(6, -18);
+      ctx.lineTo(22, -45);
+      ctx.lineTo(42, 0);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  _draw2026LandmarkSprite(ctx, key) {
+    if (key.includes('coffs')) {
+      // The Big Banana
+      ctx.save();
+      // Yellow banana body
+      ctx.fillStyle = '#facc15';
+      ctx.beginPath();
+      ctx.arc(0, -18, 26, 0.4, 2.7, false);
+      ctx.quadraticCurveTo(-14, -8, 18, -2);
+      ctx.fill();
+      // Green tip & brown stalk
+      ctx.fillStyle = '#65a30d';
+      ctx.fillRect(-22, -10, 5, 5);
+      ctx.fillStyle = '#713f12';
+      ctx.fillRect(18, -5, 4, 4);
+      // Plinth
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(-25, 0, 50, 6);
+      ctx.restore();
+    } else if (key.includes('ballina')) {
+      // The Big Pink Prawn
+      ctx.save();
+      ctx.fillStyle = '#f43f5e';
+      ctx.beginPath();
+      ctx.arc(0, -22, 18, 0, Math.PI * 2);
+      ctx.fill();
+      // Curled segmented tail
+      ctx.strokeStyle = '#e11d48';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(10, -14, 12, 0.5, 2.5);
+      ctx.stroke();
+      // Eye & antennae
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(-8, -26, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(-8, -26, 2, 0, Math.PI * 2);
+      ctx.fill();
+      // Plinth
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(-20, 0, 40, 6);
+      ctx.restore();
+    } else if (key.includes('brisbane')) {
+      // Brisbane skyline & Story Bridge
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-35, -45, 12, 45);
+      ctx.fillRect(-20, -55, 14, 55);
+      ctx.fillRect(-4, -40, 16, 40);
+      ctx.fillRect(14, -50, 18, 50);
+      // Golden beacon
+      ctx.fillStyle = '#eab308';
+      ctx.fillRect(-15, -57, 4, 3);
+    } else if (key.includes('hawkesbury')) {
+      // Massive concrete bridge tower
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillRect(-18, -48, 6, 48);
+      ctx.fillRect(12, -48, 6, 48);
+      ctx.fillRect(-18, -32, 36, 4);
+      // Cable stays
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-15, -46); ctx.lineTo(-32, 0);
+      ctx.moveTo(15, -46); ctx.lineTo(32, 0);
+      ctx.stroke();
+    } else {
+      // Highway Servo & Neon Canopy
+      ctx.fillStyle = '#047857';
+      ctx.fillRect(-26, -26, 52, 6); // Green canopy roof
+      ctx.fillStyle = '#10b981';
+      ctx.fillRect(-26, -20, 52, 2); // Neon stripe
+      // Fuel bowser pillars
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(-18, -20, 5, 20);
+      ctx.fillRect(13, -20, 5, 20);
+      // Fuel price pylon
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(28, -38, 10, 38);
+      ctx.fillStyle = '#22c55e';
+      ctx.fillRect(30, -34, 6, 8); // LED price display
+    }
+  }
+
+  _renderAutoMarchBanner(ctx) {
+    ctx.save();
+    const bannerH = 26;
+    const bannerY = VIRTUAL_HEIGHT - bannerH - 8;
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(80, bannerY, VIRTUAL_WIDTH - 160, bannerH);
+    ctx.strokeRect(80, bannerY, VIRTUAL_WIDTH - 160, bannerH);
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const text =
+      this.cartridgeId === 'pacific_2026'
+        ? '[ Press SPACE or ENTER to Pull Into Left Lane & Assess Cabin Chaos ]'
+        : '[ Press SPACE or ENTER to Size Up the Situation ]';
+
+    const pulse = 0.85 + 0.15 * Math.sin(this.animTime * 6);
+    ctx.globalAlpha = pulse;
+    ctx.fillText(text, VIRTUAL_WIDTH / 2, bannerY + bannerH / 2);
     ctx.restore();
   }
 

@@ -451,51 +451,87 @@
               <span class="text-[9px] font-mono text-neutral-500">KEYBOARD HOTKEYS</span>
             </div>
 
-            <!-- Primary Actions -->
-            <div class="grid grid-cols-1 gap-2">
-              <button @click="advanceTurn()" :disabled="isTraveling"
-                      class="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-neutral-950 font-bold rounded flex items-center justify-between text-xs shadow transition active:scale-[0.99] disabled:opacity-50">
+            <!-- 1985 MECC "Size Up the Situation" Context-Aware Menu -->
+            <div class="space-y-1.5 font-mono text-xs">
+              <!-- [1] Continue on Trail (Auto-March) -->
+              <button @click="isAutoMarching ? stopAutoMarch() : startAutoMarch()" :disabled="isTraveling"
+                      :class="isAutoMarching ? 'from-amber-600 to-amber-700 text-white animate-pulse' : 'from-amber-500 to-amber-600 text-neutral-950'"
+                      class="w-full px-2.5 py-1.5 bg-gradient-to-r font-bold rounded flex items-center justify-between text-xs shadow transition active:scale-[0.99] disabled:opacity-50">
                 <span class="flex items-center space-x-1.5">
-                  <span class="font-pixel text-[11px]">▶</span>
-                  <span x-text="cartridgeId === 'pacific_2026' ? 'Drive Next Leg' : 'Continue Trail'"></span>
+                  <span class="font-pixel text-[10px]" x-text="isAutoMarching ? '⏸' : '▶'"></span>
+                  <span x-text="isAutoMarching ? 'Size Up Situation' : (ui.currentWaypointName ? (cartridgeId === 'pacific_2026' ? '1. Merge onto M1' : '1. Continue on Trail') : (cartridgeId === 'pacific_2026' ? '1. Keep Driving North' : '1. Continue on Trail'))"></span>
                 </span>
-                <span class="bg-amber-700/40 text-neutral-950 px-1.5 py-0.5 rounded text-[10px] font-mono">[Space]</span>
+                <span class="px-1.5 py-0.5 rounded text-[10px]" :class="isAutoMarching ? 'bg-black/40 text-amber-200' : 'bg-amber-700/40 text-neutral-950'">[1 / Space]</span>
               </button>
 
-              <div class="grid grid-cols-2 gap-2">
-                <button @click="restTurn()" :disabled="isTraveling"
-                        :class="ui.supplies.food === 0 ? 'border-red-600/80 text-red-400 bg-red-950/30' : 'bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border-neutral-700/80'"
-                        class="px-2.5 py-1.5 font-medium rounded border flex items-center justify-between text-xs transition disabled:opacity-50">
-                  <span x-text="ui.supplies.food === 0 ? '⚠️ Rest (Starving)' : (cartridgeId === 'pacific_2026' ? '☕ Rest / Servo' : '⛺ Camp & Rest')"></span>
-                  <span class="text-neutral-400 font-mono text-[10px]">[R]</span>
+              <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+                <!-- [2] Check Supplies -->
+                <button @click="openSuppliesModal()"
+                        class="px-2 py-1 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 rounded border border-neutral-700/70 flex items-center justify-between">
+                  <span class="truncate">2. Supplies</span>
+                  <span class="text-neutral-500 text-[10px]">[2]</span>
                 </button>
-                <button @click="cyclePace()" :disabled="isTraveling"
-                        class="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 font-medium rounded border border-neutral-700/80 flex items-center justify-between text-xs transition disabled:opacity-50">
-                  <span>⚡ Pace</span>
-                  <span class="text-neutral-400 font-mono text-[10px]">[P]</span>
-                </button>
-              </div>
 
-              <div class="grid grid-cols-2 gap-2">
-                <button @click="launchMiniGame()" :disabled="isTraveling"
-                        class="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-amber-300 font-medium rounded border border-neutral-700/80 flex items-center justify-between text-xs transition disabled:opacity-50">
-                  <span x-text="cartridgeId === 'pacific_2026' ? '🎯 Defence' : '🎯 Hunt'"></span>
-                  <span class="text-neutral-400 font-mono text-[10px]">[H]</span>
+                <!-- [3] Look at Map -->
+                <button @click="openMapModal()"
+                        class="px-2 py-1 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 rounded border border-neutral-700/70 flex items-center justify-between">
+                  <span class="truncate">3. View Map</span>
+                  <span class="text-neutral-500 text-[10px]">[3]</span>
                 </button>
-                <button @click="openTradeModal()" :disabled="isTraveling"
-                        class="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-cyan-300 font-medium rounded border border-neutral-700/80 flex items-center justify-between text-xs transition disabled:opacity-50">
-                  <span x-text="cartridgeId === 'pacific_2026' ? '🤝 Swap / Trade' : '🤝 Attempt Trade'"></span>
-                  <span class="text-neutral-400 font-mono text-[10px]">[T]</span>
-                </button>
-              </div>
 
-              <div class="grid grid-cols-1 gap-2">
-                <button @click="openMidTrailStore()" :disabled="isTraveling || !ui.canUseStore"
-                        :class="ui.canUseStore ? 'bg-emerald-950/70 hover:bg-emerald-900/70 text-emerald-300 border-emerald-600/80 shadow' : 'bg-neutral-900/50 text-neutral-500 border-neutral-800/80'"
-                        class="px-2.5 py-1.5 font-medium rounded border flex items-center justify-between text-xs transition disabled:opacity-50">
-                  <span class="truncate" x-text="ui.canUseStore ? ('🏪 ' + ui.currentStoreName) : (cartridgeId === 'pacific_2026' ? '🏪 Servo Store (At Waypoints)' : '🏪 Trading Post (At Forts)')"></span>
-                  <span class="font-mono text-[10px] ml-1 shrink-0" :class="ui.canUseStore ? 'text-emerald-300' : 'text-neutral-600'">[S]</span>
+                <!-- [4] Change Pace -->
+                <button @click="cyclePace()"
+                        class="px-2 py-1 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 rounded border border-neutral-700/70 flex items-center justify-between">
+                  <span class="truncate">4. Pace: <span class="text-amber-400 font-bold" x-text="ui.pace.split(' ')[0]"></span></span>
+                  <span class="text-neutral-500 text-[10px]">[4]</span>
                 </button>
+
+                <!-- [5] Change Rations -->
+                <button @click="cycleRations()"
+                        class="px-2 py-1 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 rounded border border-neutral-700/70 flex items-center justify-between">
+                  <span class="truncate">5. Rations: <span class="text-amber-400 font-bold" x-text="ui.rations"></span></span>
+                  <span class="text-neutral-500 text-[10px]">[5]</span>
+                </button>
+
+                <!-- [6] Stop to Rest -->
+                <button @click="restTurn()"
+                        :class="ui.supplies.food === 0 ? 'border-red-600/80 text-red-400 bg-red-950/30' : 'bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border-neutral-700/70'"
+                        class="px-2 py-1 rounded border flex items-center justify-between">
+                  <span class="truncate" x-text="ui.supplies.food === 0 ? '6. ⚠️ Rest' : '6. Rest / Camp'"></span>
+                  <span class="text-neutral-500 text-[10px]">[6/R]</span>
+                </button>
+
+                <!-- [7] Attempt Trade -->
+                <button @click="openTradeModal()"
+                        class="px-2 py-1 bg-neutral-800 hover:bg-neutral-750 text-cyan-300 rounded border border-neutral-700/70 flex items-center justify-between">
+                  <span class="truncate">7. Barter</span>
+                  <span class="text-neutral-500 text-[10px]">[7/T]</span>
+                </button>
+
+                <!-- [8] Dynamic: Talk to People (at Waypoint) OR Hunt (on Open Trail) -->
+                <template x-if="ui.currentWaypointName">
+                  <button @click="openTalkModal()"
+                          class="col-span-2 px-2 py-1 bg-neutral-800 hover:bg-neutral-750 text-amber-300 rounded border border-amber-600/60 flex items-center justify-between">
+                    <span class="truncate" x-text="cartridgeId === 'pacific_2026' ? '8. 🗣️ Have a Yarn at the Servo' : '8. 🗣️ Talk to People at Waypoint'"></span>
+                    <span class="text-amber-500 text-[10px]">[8]</span>
+                  </button>
+                </template>
+                <template x-if="!ui.currentWaypointName">
+                  <button @click="launchMiniGame()"
+                          class="col-span-2 px-2 py-1 bg-neutral-800 hover:bg-neutral-750 text-amber-300 rounded border border-neutral-700/70 flex items-center justify-between">
+                    <span class="truncate" x-text="cartridgeId === 'pacific_2026' ? '8. 🎯 Coastal Seagull & Chip Defence' : '8. 🎯 Hunt for Wild Game'"></span>
+                    <span class="text-neutral-500 text-[10px]">[8/H]</span>
+                  </button>
+                </template>
+
+                <!-- [9] Buy Supplies (at Store Waypoint) -->
+                <template x-if="ui.canUseStore">
+                  <button @click="openMidTrailStore()"
+                          class="col-span-2 px-2 py-1 bg-emerald-950/70 hover:bg-emerald-900/70 text-emerald-300 rounded border border-emerald-600/70 flex items-center justify-between">
+                    <span class="truncate" x-text="'9. 🏪 Enter Store: ' + ui.currentStoreName"></span>
+                    <span class="text-emerald-400 text-[10px]">[9/S]</span>
+                  </button>
+                </template>
               </div>
             </div>
           </div>
@@ -817,6 +853,195 @@
         <button @click="submitAndRestart()"
                 class="w-full py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded font-mono text-xs shadow transition active:scale-[0.99]">
           Submit Record & Play Again [Enter]
+        </button>
+      </div>
+    </div>
+
+    <!-- LOOK AROUND ARRIVAL PROMPT MODAL -->
+    <div x-show="modalType === 'LOOK_AROUND'" x-transition.opacity
+         class="absolute inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-neutral-900 border-2 border-amber-500/80 rounded-xl p-6 max-w-lg w-full text-center space-y-4 shadow-2xl font-mono">
+        <div class="w-12 h-12 mx-auto rounded-full bg-amber-950 border border-amber-600 flex items-center justify-center text-amber-400 text-xl font-bold">
+          📍
+        </div>
+        <h3 class="font-pixel text-sm text-amber-400" x-text="arrivedWaypoint?.name"></h3>
+        <p class="text-xs text-neutral-300 leading-relaxed">
+          You have reached <strong class="text-neutral-100" x-text="arrivedWaypoint?.name"></strong>!
+          <br/><br/>
+          <span class="text-amber-300">Would you like to look around?</span>
+        </p>
+        <div class="flex space-x-3 pt-2">
+          <button @click="confirmLookAround(false)"
+                  class="flex-1 py-2.5 rounded bg-neutral-800 hover:bg-neutral-750 text-neutral-300 text-xs border border-neutral-700 font-bold transition">
+            [N]o, Continue Trail
+          </button>
+          <button @click="confirmLookAround(true)"
+                  class="flex-1 py-2.5 rounded bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs shadow transition active:scale-[0.99]">
+            [Y]es, Look Around!
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ILLUSTRATED LANDMARK CARD MODAL -->
+    <div x-show="modalType === 'LANDMARK_CARD'" x-transition.opacity
+         class="absolute inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-neutral-900 border-2 border-amber-500/80 rounded-xl p-6 max-w-xl w-full space-y-4 shadow-2xl font-mono">
+        <div class="flex items-center justify-between border-b border-neutral-800 pb-2">
+          <h3 class="font-pixel text-xs text-amber-400" x-text="arrivedWaypoint?.name"></h3>
+          <button @click="closeLandmarkCard()" class="text-neutral-400 hover:text-white text-sm">[Esc]</button>
+        </div>
+        <div class="bg-black/60 p-4 rounded border border-neutral-800 space-y-2 text-xs text-neutral-300">
+          <div class="text-amber-300 font-bold" x-text="'Distance: ' + (arrivedWaypoint?.distance || 0) + ' ' + ui.distanceUnit"></div>
+          <p x-text="cartridgeId === 'pacific_2026' ? 'You pull the family cruiser off the highway into the rest area. The engine ticks softly in the coastal heat, and the backseat starts unbuckling.' : 'Your schooner rattles to a halt on the high grass outside the fort. Emigrant tents and livestock dot the prairie as smoke rises from campfires.'"></p>
+        </div>
+        <div class="grid grid-cols-2 gap-2 pt-2 text-xs">
+          <button @click="openTalkModal()"
+                  class="py-2.5 bg-neutral-800 hover:bg-neutral-750 text-amber-300 rounded border border-amber-600/60 font-bold flex items-center justify-center space-x-1.5 transition">
+            <span>🗣️ Have a Yarn / Talk</span>
+            <span class="text-[10px] text-amber-400 font-mono">[T / 8]</span>
+          </button>
+          <template x-if="ui.canUseStore">
+            <button @click="openMidTrailStore()"
+                    class="py-2.5 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 rounded border border-emerald-600 font-bold flex items-center justify-center space-x-1.5 transition">
+              <span>🏪 Enter Store</span>
+              <span class="text-[10px] text-emerald-400 font-mono">[S / 9]</span>
+            </button>
+          </template>
+          <template x-if="!ui.canUseStore">
+            <button @click="openTradeModal()"
+                    class="py-2.5 bg-neutral-800 hover:bg-neutral-750 text-cyan-300 rounded border border-cyan-600 font-bold flex items-center justify-center space-x-1.5 transition">
+              <span>🤝 Attempt Trade</span>
+              <span class="text-[10px] text-cyan-400 font-mono">[7]</span>
+            </button>
+          </template>
+        </div>
+        <button @click="closeLandmarkCard()"
+                class="w-full py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded text-xs transition">
+          Return to Situation Deck [Space / Esc]
+        </button>
+      </div>
+    </div>
+
+    <!-- CONTEXTUAL TALK TO PEOPLE MODAL -->
+    <div x-show="modalType === 'TALK'" x-transition.opacity
+         class="absolute inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-neutral-900 border-2 border-amber-500/80 rounded-xl p-6 max-w-xl w-full space-y-4 shadow-2xl font-mono">
+        <div class="flex items-center justify-between border-b border-neutral-800 pb-2">
+          <div class="flex items-center space-x-2">
+            <span class="font-pixel text-xs text-amber-400" x-text="cartridgeId === 'pacific_2026' ? 'SERVO YARNS & LOCAL INTEL' : 'PIONEER RUMORS & LOCAL ADVICE'"></span>
+            <span class="text-[10px] text-neutral-500" x-text="'(' + (talkIndex + 1) + '/' + (activeTalkPool.length || 1) + ')'"></span>
+          </div>
+          <button @click="modalType = null" class="text-neutral-400 hover:text-white text-sm">[Esc]</button>
+        </div>
+
+        <div class="bg-black/60 p-4 rounded border border-neutral-800 space-y-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-amber-400 text-base">👤</span>
+            <strong class="text-amber-300 text-xs" x-text="activeTalkPool[talkIndex]?.speaker"></strong>
+          </div>
+          <p class="text-xs text-neutral-200 leading-relaxed italic border-l-2 border-amber-500/60 pl-3 py-1"
+             x-text="'“' + activeTalkPool[talkIndex]?.quote + '”'"></p>
+        </div>
+
+        <div class="flex space-x-3 pt-2">
+          <button @click="nextTalkQuote()"
+                  class="flex-1 py-2 rounded bg-neutral-800 hover:bg-neutral-750 text-amber-300 text-xs border border-neutral-700 font-bold transition">
+            Next Advice / Yarn [Space / T]
+          </button>
+          <button @click="modalType = null"
+                  class="flex-1 py-2 rounded bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition">
+            Back to Deck [Esc]
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RETRO SUPPLIES AUDIT MODAL -->
+    <div x-show="modalType === 'SUPPLIES'" x-transition.opacity
+         class="absolute inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-neutral-900 border-2 border-amber-500/80 rounded-xl p-6 max-w-xl w-full space-y-4 shadow-2xl font-mono">
+        <div class="flex items-center justify-between border-b border-neutral-800 pb-2">
+          <span class="font-pixel text-xs text-amber-400" x-text="cartridgeId === 'pacific_2026' ? 'ESKY & GLOVEBOX AUDIT' : 'WAGON MANIFEST & INVENTORY'"></span>
+          <button @click="modalType = null" class="text-neutral-400 hover:text-white text-sm">[Esc]</button>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div class="bg-black/60 p-3 rounded border border-neutral-800 text-center space-y-1">
+            <div class="text-2xl" x-text="cartridgeId === 'pacific_2026' ? '🥪' : '🌾'"></div>
+            <div class="text-[10px] text-neutral-400" x-text="cartridgeId === 'pacific_2026' ? 'Road Snacks' : 'Flour / Bacon'"></div>
+            <div class="text-sm font-bold text-amber-400" x-text="ui.supplies.food + (cartridgeId === 'pacific_2026' ? ' pkts' : ' lbs')"></div>
+          </div>
+          <div class="bg-black/60 p-3 rounded border border-neutral-800 text-center space-y-1">
+            <div class="text-2xl" x-text="cartridgeId === 'pacific_2026' ? '🪙' : '🎯'"></div>
+            <div class="text-[10px] text-neutral-400" x-text="cartridgeId === 'pacific_2026' ? 'Toll Coins / Fuel' : 'Ammunition'"></div>
+            <div class="text-sm font-bold text-neutral-100" x-text="ui.supplies.ammo + ' units'"></div>
+          </div>
+          <div class="bg-black/60 p-3 rounded border border-neutral-800 text-center space-y-1">
+            <div class="text-2xl" x-text="cartridgeId === 'pacific_2026' ? '⚡' : '🐂'"></div>
+            <div class="text-[10px] text-neutral-400" x-text="cartridgeId === 'pacific_2026' ? 'Battery / Traction' : 'Oxen Health'"></div>
+            <div class="text-sm font-bold text-emerald-400" x-text="ui.traction + '%'"></div>
+          </div>
+          <div class="bg-black/60 p-3 rounded border border-neutral-800 text-center space-y-1">
+            <div class="text-2xl" x-text="cartridgeId === 'pacific_2026' ? '🔌' : '🛞'"></div>
+            <div class="text-[10px] text-neutral-400" x-text="cartridgeId === 'pacific_2026' ? 'USB-C Leads' : 'Spare Wheels'"></div>
+            <div class="text-sm font-bold text-neutral-100" x-text="ui.supplies.partA"></div>
+          </div>
+          <div class="bg-black/60 p-3 rounded border border-neutral-800 text-center space-y-1">
+            <div class="text-2xl" x-text="cartridgeId === 'pacific_2026' ? '🧴' : '🪵'"></div>
+            <div class="text-[10px] text-neutral-400" x-text="cartridgeId === 'pacific_2026' ? 'Coolant Bottles' : 'Spare Axles'"></div>
+            <div class="text-sm font-bold text-neutral-100" x-text="ui.supplies.partB"></div>
+          </div>
+          <div class="bg-black/60 p-3 rounded border border-neutral-800 text-center space-y-1">
+            <div class="text-2xl" x-text="cartridgeId === 'pacific_2026' ? '🧻' : '🔨'"></div>
+            <div class="text-[10px] text-neutral-400" x-text="cartridgeId === 'pacific_2026' ? 'Wiper Blades' : 'Wagon Tongues'"></div>
+            <div class="text-sm font-bold text-neutral-100" x-text="ui.supplies.partC"></div>
+          </div>
+        </div>
+
+        <div class="bg-black/60 p-3 rounded border border-emerald-600/50 flex items-center justify-between text-xs">
+          <span class="text-neutral-300">Wallet Cash Reserves:</span>
+          <span class="font-bold text-emerald-400 text-sm" x-text="'$' + (ui.cashCents / 100).toFixed(2)"></span>
+        </div>
+
+        <button @click="modalType = null"
+                class="w-full py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded text-xs transition">
+          Close Manifest [Space / Esc]
+        </button>
+      </div>
+    </div>
+
+    <!-- ROUTE MAP MODAL -->
+    <div x-show="modalType === 'MAP'" x-transition.opacity
+         class="absolute inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-neutral-900 border-2 border-amber-500/80 rounded-xl p-6 max-w-2xl w-full space-y-4 shadow-2xl font-mono">
+        <div class="flex items-center justify-between border-b border-neutral-800 pb-2">
+          <span class="font-pixel text-xs text-amber-400" x-text="cartridgeId === 'pacific_2026' ? 'M1 MOTORWAY ROUTE PLOTTER' : 'THE OREGON TRAIL ROUTE MAP'"></span>
+          <button @click="modalType = null" class="text-neutral-400 hover:text-white text-sm">[Esc]</button>
+        </div>
+
+        <div class="bg-black/60 p-3 rounded border border-neutral-800 max-h-[320px] overflow-y-auto space-y-2">
+          <template x-for="(wp, idx) in cartridgeData?.waypoints" :key="wp.id">
+            <div class="p-2 rounded border flex items-center justify-between text-xs transition"
+                 :class="ui.distance >= wp.distance ? 'bg-amber-950/30 border-amber-600/70 text-amber-300' : 'bg-neutral-900/40 border-neutral-800 text-neutral-400'">
+              <div class="flex items-center space-x-2">
+                <span class="font-bold" x-text="ui.distance >= wp.distance ? '●' : '○'"></span>
+                <span class="font-semibold text-neutral-200" x-text="wp.name"></span>
+                <span x-show="wp.isBranchPoint" class="px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 text-[9px] border border-cyan-700/60 font-bold">FORK</span>
+                <span x-show="wp.hasStore" class="px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 text-[9px] border border-emerald-700/60 font-bold">STORE</span>
+              </div>
+              <div class="font-mono text-[10px]" x-text="wp.distance + ' ' + ui.distanceUnit"></div>
+            </div>
+          </template>
+        </div>
+
+        <div class="text-[11px] text-neutral-400 text-center font-mono">
+          Current Progress: <strong class="text-amber-400" x-text="ui.distance + ' ' + ui.distanceUnit"></strong> of <strong class="text-neutral-200" x-text="ui.totalDistance + ' ' + ui.distanceUnit"></strong>
+        </div>
+
+        <button @click="modalType = null"
+                class="w-full py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded text-xs transition">
+          Return to Deck [Space / Esc]
         </button>
       </div>
     </div>
