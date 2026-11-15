@@ -13,7 +13,7 @@ from typing import Annotated, Any
 import uuid
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
@@ -87,8 +87,12 @@ app = FastAPI(
 )
 
 static_dir = Path(__file__).resolve().parent / "static"
-if static_dir.exists():
-    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+
+@app.get("/", include_in_schema=False)
+async def serve_index() -> RedirectResponse:
+    """Redirects root URL to the static entrypoint so relative assets match static hosting."""
+    return RedirectResponse(url="/static/index.html", status_code=307)
 
 
 @app.exception_handler(Exception)
@@ -113,6 +117,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
 @app.get("/health", response_model=HealthCheckResponse, tags=["Health"])
 @app.get("/api/health", response_model=HealthCheckResponse, tags=["Health"])
+@app.get("/static/api/health", response_model=HealthCheckResponse, include_in_schema=False)
 async def health_check() -> HealthCheckResponse:
     """Returns application health, SQLite WAL mode, and startup verification state."""
     startup = getattr(app.state, "startup_status", None)
@@ -251,10 +256,5 @@ async def shutdown_system() -> dict[str, str]:
     }
 
 
-@app.get("/", include_in_schema=False)
-async def serve_index() -> FileResponse:
-    """Serves the single-page application static entrypoint."""
-    index_file = static_dir / "index.html"
-    if index_file.exists():
-        return FileResponse(index_file)
-    return FileResponse(Path(__file__).resolve().parent / "static" / "index.html")
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")

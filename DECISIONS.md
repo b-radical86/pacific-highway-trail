@@ -91,3 +91,7 @@ Rationale: Delivers authentic 320x200 8-bit indexed pixel-art landmark postcards
 Date: 2026-11-07
 Decision: Upgrade procedural 2D vector canvas pipeline (`canvas_engine.js`, `renderers_1848.js`, `renderers_2026.js`) with 4-stop volumetric sky gradients + horizon haze, global composite lighting (`multiply` night tint + `screen` radial headlight cones), parametric weather shaders (72-drop rain + road splash ripples, M1 bitumen heat mirage, High Sierra/Blue Mountain 2px snow accumulation), 3-layer aerial perspective silhouettes (0.1x/0.4x/1.0x), ground contact drop shadows + wheel dust puffs, and pre-baked CRT scanlines + radial vignette.
 Rationale: Elevates visual depth, atmospheric lighting, and retro CRT fidelity at 60 FPS using pure hardware-accelerated Canvas 2D compositing and pre-baked offscreen patterns with zero runtime asset overhead.
+
+Date: 2026-11-15
+Decision: Enable dual-target hosting (Local FastAPI + GitHub Pages) via relative static asset paths, `.nojekyll`, `GET /` 307 redirect to `/static/index.html`, `/static/api/health` alias, capability-based `detectBackend()` (`./api/health` 400ms probe cached in `sessionStorage`), localStorage leaderboard/memorial fallback, standalone single-file bundler (`scripts/build_single_file.py`), and `.github/workflows/pages.yml`.
+Rationale: Allows `app/static/` to run identically behind FastAPI or as a static GitHub Pages deployment while preserving offline `file://` bundling and SQLite WAL persistence when locally hosted.

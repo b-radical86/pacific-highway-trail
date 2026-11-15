@@ -13,7 +13,7 @@ import { CanvasEngine } from '../canvas/canvas_engine.js';
 import { RiverScene } from '../scenes/river_scene.js';
 import { HuntScene } from '../scenes/hunt_scene.js';
 import { sound, playLandmarkTheme } from './audio_synth.js';
-import { StorageManager } from '../engine/storage.js';
+import { StorageManager, detectBackend } from '../engine/storage.js';
 import { OREGON_1848_CARTRIDGE } from '../cartridges/oregon_1848.js';
 import { PACIFIC_2026_CARTRIDGE } from '../cartridges/pacific_2026.js';
 import { getLandmarkCardDataUri } from '../cartridges/landmark_cards.js';
@@ -36,6 +36,7 @@ export function createTrailApp() {
     },
 
     // Persistence & Leaderboard State
+    hasBackend: false,
     playerName: 'Brad & Family',
     epitaphText: '',
     leaderboard: [],
@@ -100,6 +101,7 @@ export function createTrailApp() {
         window.trailApp = this;
       }
       this.soundMuted = sound.muted;
+      this.hasBackend = await detectBackend();
       this.checkSavedGame();
       this.initEngine(this.cartridgeId);
       this.initCanvas();
@@ -948,11 +950,16 @@ export function createTrailApp() {
     },
 
     confirmExit() {
+      if (!this.hasBackend) return;
       sound.playBeep(260, 'square', 0.1);
       this.modalType = 'EXIT';
     },
 
     async executeShutdown() {
+      if (!this.hasBackend) {
+        this.modalType = null;
+        return;
+      }
       sound.playBeep(220, 'sawtooth', 0.2);
       this.autoSave();
       this.modalType = 'SHUTDOWN_IN_PROGRESS';

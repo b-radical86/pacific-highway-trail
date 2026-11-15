@@ -59,6 +59,7 @@ import {
   LANDMARK_CARDS,
   getLandmarkCardDataUri
 } from './app/static/js/cartridges/landmark_cards.js';
+import { StorageManager, detectBackend } from './app/static/js/engine/storage.js';
 
 // 1. PRNG determinism & state restore
 const prng1 = new PRNG(12345);
@@ -299,7 +300,6 @@ const keyHit = pacificHunt.handleKeyDown(' ');
 if (typeof keyHit !== 'object') throw new Error('Keyboard fire return mismatch');
 
 // 9. StorageManager serialization & offline fallback
-import { StorageManager } from './app/static/js/engine/storage.js';
 const mockStore = {};
 globalThis.localStorage = {
   getItem: (k) => mockStore[k] || null,
@@ -632,6 +632,49 @@ for (const lmKey of requiredLandmarks) {
   }
 }
 
+// 17. Capability-based backend probe & static localStorage leaderboard fallback
+const memStore = new Map();
+const sessStore = new Map();
+globalThis.localStorage = {
+  getItem: (k) => (memStore.has(k) ? memStore.get(k) : null),
+  setItem: (k, v) => { memStore.set(k, String(v)); },
+  removeItem: (k) => { memStore.delete(k); }
+};
+globalThis.sessionStorage = {
+  getItem: (k) => (sessStore.has(k) ? sessStore.get(k) : null),
+  setItem: (k, v) => { sessStore.set(k, String(v)); },
+  removeItem: (k) => { sessStore.delete(k); }
+};
+let fetchCount = 0;
+globalThis.fetch = async (url) => {
+  fetchCount += 1;
+  return { ok: false, status: 404, headers: { get: () => 'text/html' } };
+};
+const hasBackendStatic = await detectBackend(true);
+const hasBackendCached = await detectBackend();
+if (hasBackendStatic !== false || hasBackendCached !== false || fetchCount !== 1) {
+  throw new Error('Expected static detectBackend()=false cached once per session');
+}
+const localSub = await StorageManager.submitRun({
+  cartridge_id: 'pacific_2026',
+  player_name: 'Static Family',
+  score: 9100,
+  turns: 9,
+  distance: 420.5,
+  status: 'DIED',
+  epitaph: 'Stopped for hot chips at Kempsey'
+});
+const localLb = await StorageManager.fetchLeaderboard('pacific_2026');
+if (
+  !localSub.success ||
+  !localSub.local ||
+  localLb.high_scores.length !== 1 ||
+  localLb.memorials.length !== 1 ||
+  localLb.memorials[0].epitaph !== 'Stopped for hot chips at Kempsey'
+) {
+  throw new Error('Static localStorage leaderboard fallback failed: ' + JSON.stringify(localLb));
+}
+
 console.log('NODE_ESM_ASSERTIONS_PASSED');
 """
     result = subprocess.run(
@@ -760,6 +803,11 @@ def run_golden_path_smoke_test() -> None:
         settings.error_log_path = tmp_path / "logs" / "test_app_errors.jsonl"
 
         with TestClient(app) as client:
+            # Verify GET / redirects to /static/index.html and serves 200
+            root_resp = client.get("/", follow_redirects=True)
+            assert root_resp.status_code == 200, f"Root GET / failed: {root_resp.status_code}"
+            assert "PACIFIC HIGHWAY TRAIL" in root_resp.text, "Root index missing app title"
+
             resp = client.get("/health")
             assert resp.status_code == 200, f"Health check failed: {resp.text}"
             data = resp.json()
@@ -769,10 +817,11 @@ def run_golden_path_smoke_test() -> None:
             assert data["startup_check"] is not None
             assert data["startup_check"]["journal_mode"].lower() == "wal"
 
-            # Check /api/health alias
-            alias_resp = client.get("/api/health")
-            assert alias_resp.status_code == 200
-            assert alias_resp.json()["status"] == "ok"
+            # Check /api/health and /static/api/health aliases
+            for health_url in ("/api/health", "/static/api/health"):
+                alias_resp = client.get(health_url)
+                assert alias_resp.status_code == 200, f"{health_url} failed"
+                assert alias_resp.json()["status"] == "ok"
 
             # 7. Verify SQLite Leaderboard & Roadside Memorial API
             sub_1848 = {
@@ -869,7 +918,16 @@ def run_golden_path_smoke_test() -> None:
             assert shutdown_resp.status_code == 200
             assert shutdown_resp.json()["status"] == "shutting_down"
 
-    # 9. Cross-Language Node ESM Verification
+    # 9. Static Hosting Parity Check (no hardcoded /static/ root asset prefixes + .nojekyll)
+    static_root = PROJECT_ROOT / "app" / "static"
+    assert (static_root / ".nojekyll").exists(), "Missing app/static/.nojekyll for GitHub Pages"
+    scan_targets = [static_root / "index.html", *(static_root / "js").rglob("*.js")]
+    for asset_file in scan_targets:
+        content = asset_file.read_text(encoding="utf-8")
+        if '"/static/' in content or "'/static/" in content:
+            raise AssertionError(f"Hardcoded /static/ prefix found in {asset_file}")
+
+    # 10. Cross-Language Node ESM Verification
     verify_node_esm_engine(PROJECT_ROOT)
 
     print(
